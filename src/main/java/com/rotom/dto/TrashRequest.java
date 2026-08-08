@@ -1,0 +1,19 @@
+package com.rotom.dto;
+
+import java.util.List;
+
+public class TrashRequest {
+
+    private List<String> ids;
+
+    public TrashRequest() {
+    }
+
+    public List<String> getIds() {
+        return ids;
+    }
+
+    public void setIds(List<String> ids) {
+        this.ids = ids;
+    }
+}

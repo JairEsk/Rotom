@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R.O.T.O.M. - Remover Of Trash & Obsolete Mails</title>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <h1>R.O.T.O.M.</h1>
+            <p class="subtitle">Remover Of Trash & Obsolete Mails</p>
+        </div>
+        <div id="auth-status" class="auth-status">
+            <span id="user-email">Not connected</span>
+            <span id="auth-indicator" class="indicator disconnected"></span>
+        </div>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="control-group">
+                <label for="size-filter">Show emails larger than:</label>
+                <select id="size-filter">
+                    <option value="1">1 MB</option>
+                    <option value="3">3 MB</option>
+                    <option value="5" selected>5 MB</option>
+                    <option value="10">10 MB</option>
+                    <option value="15">15 MB</option>
+                    <option value="25">25 MB</option>
+                </select>
+                <button id="scan-btn" class="btn btn-primary">Scan Inbox</button>
+            </div>
+            <div class="actions-group" id="actions-group" style="display: none;">
+                <button id="select-all-btn" class="btn btn-secondary">Select All</button>
+                <button id="trash-btn" class="btn btn-danger">Trash Selected</button>
+                <span id="selection-count">0 selected</span>
+            </div>
+        </section>
+
+        <section id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Scanning your inbox...</p>
+        </section>
+
+        <section id="results" class="results" style="display: none;">
+            <div class="results-header">
+                <h2>Found <span id="email-count">0</span> large emails</h2>
+                <p>Total size: <span id="total-size">0 MB</span></p>
+            </div>
+            <table id="email-table">
+                <thead>
+                    <tr>
+                        <th class="col-check"><input type="checkbox" id="header-checkbox"></th>
+                        <th class="col-from">From</th>
+                        <th class="col-subject">Subject</th>
+                        <th class="col-date">Date</th>
+                        <th class="col-size">Size</th>
+                    </tr>
+                </thead>
+                <tbody id="email-body">
+                </tbody>
+            </table>
+        </section>
+
+        <section id="empty-state" class="empty-state" style="display: none;">
+            <h2>No large emails found</h2>
+            <p>Your inbox is already clean! Try a smaller size filter.</p>
+        </section>
+
+        <section id="error-state" class="error-state" style="display: none;">
+            <h2>Something went wrong</h2>
+            <p id="error-message"></p>
+        </section>
+    </main>
+
+    <div id="toast" class="toast" style="display: none;"></div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
