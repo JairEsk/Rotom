@@ -1,222 +1,310 @@
-// API endpoints
 const API = {
-    authStatus: '/api/auth/status',
-    emails: '/api/emails',
-    trash: '/api/emails/trash',
-    storage: '/api/storage'
+    setupStatus:  '/api/setup/status',
+    uploadCreds:  '/api/setup/credentials',
+    connectGmail: '/api/setup/connect',
+    authStatus:   '/api/auth/status',
+    emails:       '/api/emails',
+    trash:        '/api/emails/trash',
 };
 
-// State
 let emails = [];
 let selectedIds = new Set();
+let selectedFile = null;
 
-// DOM Elements - cache them on load
 document.addEventListener('DOMContentLoaded', () => {
-    // Cache DOM elements
-    const scanBtn = document.getElementById('scan-btn');
-    const sizeFilter = document.getElementById('size-filter');
-    const selectAllBtn = document.getElementById('select-all-btn');
-    const trashBtn = document.getElementById('trash-btn');
-    const headerCheckbox = document.getElementById('header-checkbox');
-    const emailBody = document.getElementById('email-body');
-    const loadingSection = document.getElementById('loading');
-    const resultsSection = document.getElementById('results');
-    const emptyState = document.getElementById('empty-state');
-    const errorState = document.getElementById('error-state');
-    const actionsGroup = document.getElementById('actions-group');
-    const selectionCount = document.getElementById('selection-count');
-    const emailCount = document.getElementById('email-count');
-    const totalSize = document.getElementById('total-size');
+    init();
+});
 
-    // Check auth on load
-    checkAuth();
+// ─── Boot ────────────────────────────────────────────────────────────────────
 
-    // Event listeners
-    scanBtn.addEventListener('click', scanEmails);
-    selectAllBtn.addEventListener('click', toggleSelectAll);
-    trashBtn.addEventListener('click', trashSelected);
-    headerCheckbox.addEventListener('change', toggleSelectAll);
+async function init() {
+    try {
+        const res  = await fetch(API.setupStatus);
+        const data = await res.json();
 
-    async function checkAuth() {
-        try {
-            const res = await fetch(API.authStatus);
-            const data = await res.json();
-            const emailEl = document.getElementById('user-email');
-            const indicator = document.getElementById('auth-indicator');
-            if (data.authenticated && data.email) {
-                emailEl.textContent = data.email;
-                indicator.classList.remove('disconnected');
-                indicator.classList.add('connected');
-            }
-        } catch (e) {
-            console.error('Auth check failed:', e);
-        }
-    }
-
-    async function scanEmails() {
-        const size = sizeFilter.value;
-        showSection('loading');
-        actionsGroup.style.display = 'none';
-        selectedIds.clear();
-        updateSelectionCount();
-
-        try {
-            const res = await fetch(`${API.emails}?size=${size}`);
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Failed to scan emails');
-            }
-            emails = await res.json();
-
-            if (emails.length === 0) {
-                showSection('empty');
-                return;
-            }
-
-            renderEmails();
-            showSection('results');
-            actionsGroup.style.display = 'flex';
-            emailCount.textContent = emails.length;
-            
-            // Calculate total size
-            const total = emails.reduce((sum, e) => sum + e.estimatedSize, 0);
-            totalSize.textContent = formatBytes(total);
-        } catch (e) {
-            showError(e.message);
-        }
-    }
-
-    function renderEmails() {
-        emailBody.innerHTML = '';
-        emails.forEach(email => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
-                <td class="from-cell" title="${escapeHtml(email.from)}">${escapeHtml(email.from)}</td>
-                <td class="subject-cell" title="${escapeHtml(email.subject)}">${escapeHtml(email.subject)}</td>
-                <td class="date-cell">${escapeHtml(email.date)}</td>
-                <td class="size-cell">${escapeHtml(email.readableSize)}</td>
-            `;
-            tr.querySelector('.email-check').addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    selectedIds.add(email.id);
-                } else {
-                    selectedIds.delete(email.id);
-                }
-                updateSelectionCount();
-            });
-            emailBody.appendChild(tr);
-        });
-    }
-
-    function toggleSelectAll() {
-        const checkboxes = document.querySelectorAll('.email-check');
-        const allChecked = selectedIds.size === emails.length;
-        
-        if (allChecked) {
-            selectedIds.clear();
-            checkboxes.forEach(cb => cb.checked = false);
-            headerCheckbox.checked = false;
+        if (data.authenticated && data.email) {
+            showApp(data.email);
+        } else if (data.credentialsConfigured) {
+            // credentials.json exists but not yet authed → jump to step 3
+            showSetup();
+            goToStep(3);
         } else {
-            emails.forEach(e => selectedIds.add(e.id));
-            checkboxes.forEach(cb => cb.checked = true);
-            headerCheckbox.checked = true;
+            showSetup();
         }
-        updateSelectionCount();
+    } catch {
+        showSetup();
     }
+}
 
-    function updateSelectionCount() {
-        selectionCount.textContent = `${selectedIds.size} selected`;
-        trashBtn.disabled = selectedIds.size === 0;
+// ─── Screen toggles ──────────────────────────────────────────────────────────
+
+function showSetup() {
+    document.getElementById('setup-screen').style.display = 'block';
+    document.getElementById('app-screen').style.display  = 'none';
+    initSetupListeners();
+}
+
+function showApp(email) {
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display  = 'block';
+    if (email) {
+        document.getElementById('user-email').textContent = email;
+        document.getElementById('auth-indicator').classList.replace('disconnected', 'connected');
     }
+    initAppListeners();
+}
 
-    async function trashSelected() {
-        if (selectedIds.size === 0) return;
-        
-        const count = selectedIds.size;
-        if (!confirm(`Are you sure you want to trash ${count} email(s)? They will be moved to Gmail's Trash folder.`)) {
+// ─── Setup flow ──────────────────────────────────────────────────────────────
+
+function initSetupListeners() {
+    const fileInput = document.getElementById('credentials-file');
+    const dropZone  = document.getElementById('drop-zone');
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', e => handleFileSelect(e.target.files[0]));
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+    });
+    dropZone.addEventListener('click', e => {
+        if (e.target.tagName !== 'BUTTON') fileInput.click();
+    });
+}
+
+function goToStep(n) {
+    [1, 2, 3].forEach(i => {
+        const el = document.getElementById(`step-${i}`);
+        if (el) el.style.display = i === n ? 'flex' : 'none';
+    });
+}
+
+function handleFileSelect(file) {
+    if (!file) return;
+    selectedFile = file;
+    const nameEl = document.getElementById('file-name');
+    nameEl.textContent = `✓ ${file.name}`;
+    nameEl.style.display = 'block';
+    document.getElementById('upload-btn').disabled = false;
+    document.getElementById('upload-error').style.display = 'none';
+}
+
+async function uploadCredentials() {
+    if (!selectedFile) return;
+
+    const btn = document.getElementById('upload-btn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+
+    try {
+        const res  = await fetch(API.uploadCreds, { method: 'POST', body: form });
+        const data = await res.json();
+
+        if (!res.ok) {
+            showUploadError(data.error || 'Upload failed');
             return;
         }
 
-        trashBtn.disabled = true;
-        trashBtn.textContent = 'Trashing...';
+        goToStep(3);
+    } catch (e) {
+        showUploadError('Network error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload & Continue →';
+    }
+}
 
-        try {
-            const res = await fetch(API.trash, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ids: Array.from(selectedIds) })
-            });
-            
-            if (!res.ok) throw new Error('Failed to trash emails');
-            
-            const data = await res.json();
-            showToast(`${data.trashedCount} email(s) moved to trash successfully!`);
-            
-            // Remove trashed emails from the list
-            emails = emails.filter(e => !selectedIds.has(e.id));
-            selectedIds.clear();
-            
-            if (emails.length === 0) {
-                showSection('empty');
-                actionsGroup.style.display = 'none';
-            } else {
-                renderEmails();
-                emailCount.textContent = emails.length;
-                const total = emails.reduce((sum, e) => sum + e.estimatedSize, 0);
-                totalSize.textContent = formatBytes(total);
-            }
+function showUploadError(msg) {
+    const el = document.getElementById('upload-error');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+async function connectGmail() {
+    const btn        = document.getElementById('connect-btn');
+    const statusEl   = document.getElementById('connect-status');
+
+    btn.disabled = true;
+    statusEl.className = 'connect-status loading';
+    statusEl.innerHTML = '<div class="mini-spinner"></div><span>Waiting for browser authorization… check the window that just opened.</span>';
+
+    try {
+        const res  = await fetch(API.connectGmail, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            statusEl.className = 'connect-status success';
+            statusEl.innerHTML = `✓ Connected as <strong>${data.email}</strong>`;
+            setTimeout(() => showApp(data.email), 1200);
+        } else {
+            statusEl.className = 'connect-status error';
+            statusEl.innerHTML = `✗ ${data.error || 'Authorization failed. Try again.'}`;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        statusEl.className = 'connect-status error';
+        statusEl.innerHTML = `✗ Network error: ${e.message}`;
+        btn.disabled = false;
+    }
+}
+
+// ─── Main app ────────────────────────────────────────────────────────────────
+
+function initAppListeners() {
+    document.getElementById('scan-btn').addEventListener('click', scanEmails);
+    document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
+    document.getElementById('trash-btn').addEventListener('click', trashSelected);
+    document.getElementById('header-checkbox').addEventListener('change', toggleSelectAll);
+}
+
+async function scanEmails() {
+    const size = document.getElementById('size-filter').value;
+    showSection('loading');
+    document.getElementById('actions-group').style.display = 'none';
+    selectedIds.clear();
+    updateSelectionCount();
+
+    try {
+        const res = await fetch(`${API.emails}?size=${size}`);
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to scan emails');
+        }
+        emails = await res.json();
+
+        if (emails.length === 0) { showSection('empty'); return; }
+
+        renderEmails();
+        showSection('results');
+        document.getElementById('actions-group').style.display = 'flex';
+        document.getElementById('email-count').textContent = emails.length;
+        const total = emails.reduce((s, e) => s + e.estimatedSize, 0);
+        document.getElementById('total-size').textContent = formatBytes(total);
+    } catch (e) {
+        showError(e.message);
+    }
+}
+
+function renderEmails() {
+    const body = document.getElementById('email-body');
+    body.innerHTML = '';
+    emails.forEach(email => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
+            <td class="from-cell"    title="${escapeHtml(email.from)}">${escapeHtml(email.from)}</td>
+            <td class="subject-cell" title="${escapeHtml(email.subject)}">${escapeHtml(email.subject)}</td>
+            <td class="date-cell">${escapeHtml(email.date)}</td>
+            <td class="size-cell">${escapeHtml(email.readableSize)}</td>
+        `;
+        tr.querySelector('.email-check').addEventListener('change', e => {
+            e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
             updateSelectionCount();
-        } catch (e) {
-            showToast('Error: ' + e.message, true);
-        } finally {
-            trashBtn.disabled = false;
-            trashBtn.textContent = 'Trash Selected';
+        });
+        body.appendChild(tr);
+    });
+}
+
+function toggleSelectAll() {
+    const checkboxes = document.querySelectorAll('.email-check');
+    const allChecked = selectedIds.size === emails.length;
+    if (allChecked) {
+        selectedIds.clear();
+        checkboxes.forEach(cb => cb.checked = false);
+        document.getElementById('header-checkbox').checked = false;
+    } else {
+        emails.forEach(e => selectedIds.add(e.id));
+        checkboxes.forEach(cb => cb.checked = true);
+        document.getElementById('header-checkbox').checked = true;
+    }
+    updateSelectionCount();
+}
+
+function updateSelectionCount() {
+    document.getElementById('selection-count').textContent = `${selectedIds.size} selected`;
+    document.getElementById('trash-btn').disabled = selectedIds.size === 0;
+}
+
+async function trashSelected() {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    if (!confirm(`Move ${count} email(s) to Gmail Trash? You can recover them within 30 days.`)) return;
+
+    const btn = document.getElementById('trash-btn');
+    btn.disabled = true;
+    btn.textContent = 'Trashing...';
+
+    try {
+        const res = await fetch(API.trash, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: Array.from(selectedIds) })
+        });
+        if (!res.ok) throw new Error('Failed to trash emails');
+        const data = await res.json();
+
+        showToast(`${data.trashedCount} email(s) moved to Trash.`);
+        emails = emails.filter(e => !selectedIds.has(e.id));
+        selectedIds.clear();
+
+        if (emails.length === 0) {
+            showSection('empty');
+            document.getElementById('actions-group').style.display = 'none';
+        } else {
+            renderEmails();
+            document.getElementById('email-count').textContent = emails.length;
+            const total = emails.reduce((s, e) => s + e.estimatedSize, 0);
+            document.getElementById('total-size').textContent = formatBytes(total);
         }
+        updateSelectionCount();
+    } catch (e) {
+        showToast('Error: ' + e.message, true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Trash Selected';
     }
+}
 
-    function showSection(section) {
-        loadingSection.style.display = 'none';
-        resultsSection.style.display = 'none';
-        emptyState.style.display = 'none';
-        errorState.style.display = 'none';
-        
-        switch(section) {
-            case 'loading': loadingSection.style.display = 'flex'; break;
-            case 'results': resultsSection.style.display = 'block'; break;
-            case 'empty': emptyState.style.display = 'block'; break;
-            case 'error': errorState.style.display = 'block'; break;
-        }
-    }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    function showError(message) {
-        document.getElementById('error-message').textContent = message;
-        showSection('error');
-    }
+function showSection(section) {
+    ['loading','results','empty-state','error-state'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+    const map = { loading: 'loading', results: 'results', empty: 'empty-state', error: 'error-state' };
+    const el = document.getElementById(map[section]);
+    if (el) el.style.display = section === 'loading' ? 'flex' : 'block';
+}
 
-    function showToast(message, isError = false) {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
-        toast.style.display = 'block';
-        
-        setTimeout(() => {
-            toast.style.display = 'none';
-        }, 4000);
-    }
+function showError(msg) {
+    document.getElementById('error-message').textContent = msg;
+    showSection('error');
+}
 
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
+function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
 
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-});
+function formatBytes(bytes) {
+    if (!bytes) return '0 B';
+    const k = 1024, sizes = ['B','KB','MB','GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}

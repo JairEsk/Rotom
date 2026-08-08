@@ -27,9 +27,15 @@ public class EmailController {
     @GetMapping("/auth/status")
     public Map<String, Object> getAuthStatus() {
         Map<String, Object> status = new HashMap<>();
-        boolean authenticated = googleAuthService.isAuthenticated();
-        status.put("authenticated", authenticated);
-        status.put("email", authenticated ? googleAuthService.getUserEmail() : null);
+        try {
+            boolean authenticated = googleAuthService.isAuthenticated();
+            status.put("authenticated", authenticated);
+            status.put("email", authenticated ? googleAuthService.getUserEmail() : null);
+        } catch (Exception e) {
+            status.put("authenticated", false);
+            status.put("email", null);
+            status.put("error", "Gmail not configured: " + e.getMessage());
+        }
         return status;
     }
 

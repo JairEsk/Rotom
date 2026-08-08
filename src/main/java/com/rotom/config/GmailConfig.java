@@ -13,6 +13,7 @@ import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.GmailScopes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,6 +29,7 @@ public class GmailConfig {
     private static final List<String> SCOPES = Collections.singletonList(GmailScopes.GMAIL_MODIFY);
 
     @Bean
+    @Lazy
     public Gmail gmailService() {
         try {
             File credentialsFile = new File("credentials.json");

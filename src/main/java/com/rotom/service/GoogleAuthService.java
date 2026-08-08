@@ -2,6 +2,7 @@ package com.rotom.service;
 
 import com.google.api.services.gmail.Gmail;
 import com.google.api.services.gmail.model.Profile;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -9,7 +10,7 @@ public class GoogleAuthService {
 
     private final Gmail gmail;
 
-    public GoogleAuthService(Gmail gmail) {
+    public GoogleAuthService(@Lazy Gmail gmail) {
         this.gmail = gmail;
     }
 
@@ -18,7 +19,12 @@ public class GoogleAuthService {
     }
 
     public boolean isAuthenticated() {
-        return gmail != null;
+        try {
+            gmail.users().getProfile("me").execute();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public String getUserEmail() {
@@ -26,7 +32,7 @@ public class GoogleAuthService {
             Profile profile = gmail.users().getProfile("me").execute();
             return profile.getEmailAddress();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to retrieve user email: " + e.getMessage(), e);
+            return null;
         }
     }
 }
