@@ -5,23 +5,23 @@
 
 /* ---------- Design Tokens ---------- */
 :root {
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-surface: #1c2a4a;
-    --bg-hover: #1f3157;
-    --accent: #e94560;
-    --accent-hover: #ff6b81;
-    --accent-dark: #c0374d;
-    --secondary: #0f3460;
-    --secondary-hover: #154785;
+    --bg-primary: #1E1E1E;
+    --bg-secondary: #2C313C;
+    --bg-surface: #353b47;
+    --bg-hover: #3d4452;
+    --accent: #FF6B00;
+    --accent-hover: #F87030;
+    --accent-dark: #cc5500;
+    --secondary: #00A3FF;
+    --secondary-hover: #29E2FF;
     --text: #e0e0e0;
-    --text-heading: #ffffff;
-    --text-muted: #8892a4;
-    --border: #2a3a5c;
+    --text-heading: #FFFFFF;
+    --text-muted: #9aa0ad;
+    --border: #444c5a;
     --success: #2ecc71;
     --error: #e74c3c;
     --radius: 8px;
-    --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
     --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
         Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
     --transition: 0.2s ease;
@@ -72,9 +72,9 @@ header {
     align-items: center;
     justify-content: space-between;
     padding: 1.25rem 2rem;
-    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--secondary) 100%);
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, #1a3a52 100%);
     border-bottom: 2px solid var(--accent);
-    box-shadow: 0 2px 16px rgba(233, 69, 96, 0.15);
+    box-shadow: 0 2px 16px rgba(255, 107, 0, 0.15);
 }
 
 header h1 {
@@ -230,16 +230,18 @@ select:focus {
 
 .btn-primary:hover:not(:disabled) {
     background: var(--accent-hover);
-    box-shadow: 0 0 12px rgba(233, 69, 96, 0.35);
+    box-shadow: 0 0 12px rgba(255, 107, 0, 0.4);
 }
 
 .btn-secondary {
-    background: var(--secondary);
-    color: var(--text);
+    background: rgba(0, 163, 255, 0.15);
+    color: var(--secondary);
+    border: 1px solid var(--secondary);
 }
 
 .btn-secondary:hover:not(:disabled) {
-    background: var(--secondary-hover);
+    background: rgba(0, 163, 255, 0.25);
+    box-shadow: 0 0 10px rgba(0, 163, 255, 0.3);
 }
 
 .btn-danger {
@@ -345,7 +347,7 @@ tbody tr {
 }
 
 tbody tr:nth-child(even) {
-    background: rgba(15, 52, 96, 0.15);
+    background: rgba(0, 163, 255, 0.04);
 }
 
 tbody tr:hover {
@@ -588,7 +590,7 @@ code {
 .file-drop-zone:hover,
 .file-drop-zone.drag-over {
     border-color: var(--accent);
-    background: rgba(233, 69, 96, 0.05);
+    background: rgba(255, 107, 0, 0.06);
 }
 
 .drop-icon {
@@ -629,7 +631,7 @@ code {
 }
 
 .connect-status.info {
-    background: rgba(15, 52, 96, 0.5);
+    background: rgba(0, 163, 255, 0.08);
     border: 1px solid var(--border);
     color: var(--text);
 }
@@ -648,7 +650,7 @@ code {
 }
 
 .connect-status.loading {
-    background: rgba(15, 52, 96, 0.5);
+    background: rgba(0, 163, 255, 0.08);
     border: 1px solid var(--border);
     color: var(--text-muted);
     display: flex;
