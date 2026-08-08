@@ -22,10 +22,18 @@ async function init() {
         const res  = await fetch(API.setupStatus);
         const data = await res.json();
 
-        if (data.authenticated && data.email) {
-            showApp(data.email);
-        } else if (data.credentialsConfigured) {
-            // credentials.json exists but not yet authed → jump to step 3
+        if (data.authenticated) {
+            // Both credentials.json and token exist — connect silently (no browser pop-up)
+            const connRes  = await fetch(API.connectGmail, { method: 'POST' });
+            const connData = await connRes.json();
+            if (connRes.ok && connData.success) {
+                showApp(connData.email);
+                return;
+            }
+        }
+
+        if (data.credentialsConfigured) {
+            // credentials.json exists but no token yet → show step 3
             showSetup();
             goToStep(3);
         } else {

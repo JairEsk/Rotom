@@ -25,22 +25,13 @@ public class SetupController {
     public Map<String, Object> getSetupStatus() {
         Map<String, Object> status = new HashMap<>();
         boolean credentialsExist = new File("credentials.json").exists();
+        // Token is saved by Google's client library as tokens/StoredCredential
+        boolean tokenExists = new File("tokens/StoredCredential").exists();
+
         status.put("credentialsConfigured", credentialsExist);
-
-        if (credentialsExist) {
-            try {
-                boolean auth = googleAuthService.isAuthenticated();
-                status.put("authenticated", auth);
-                status.put("email", auth ? googleAuthService.getUserEmail() : null);
-            } catch (Exception e) {
-                status.put("authenticated", false);
-                status.put("email", null);
-            }
-        } else {
-            status.put("authenticated", false);
-            status.put("email", null);
-        }
-
+        // Only report authenticated if both files exist on disk — no OAuth trigger here
+        status.put("authenticated", credentialsExist && tokenExists);
+        status.put("email", null); // email is resolved only after explicit connect
         return status;
     }
 
@@ -70,12 +61,14 @@ public class SetupController {
     @PostMapping("/connect")
     public ResponseEntity<?> connectGmail() {
         try {
-            // Triggers the lazy Gmail bean → opens browser for OAuth consent
+            // This triggers the lazy Gmail bean.
+            // If tokens/StoredCredential already exists, Google's library uses it silently (no browser).
+            // If not, it opens the browser for OAuth consent.
             String email = googleAuthService.getUserEmail();
             if (email != null) {
                 return ResponseEntity.ok(Map.of("success", true, "email", email));
             }
-            return ResponseEntity.status(500).body(Map.of("error", "Authentication failed"));
+            return ResponseEntity.status(500).body(Map.of("error", "Authentication failed. Could not retrieve email."));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
