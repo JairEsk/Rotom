@@ -1,8 +1,7 @@
 const API = {
     setupStatus:  '/api/setup/status',
     uploadCreds:  '/api/setup/credentials',
-    connectGmail: '/api/setup/connect',
-    authStatus:   '/api/auth/status',
+    authUrl:      '/api/setup/auth-url',
     emails:       '/api/emails',
     trash:        '/api/emails/trash',
 };
@@ -18,20 +17,40 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─── Boot ────────────────────────────────────────────────────────────────────
 
 async function init() {
+    // Check if we're returning from OAuth
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('oauth_success')) {
+        history.replaceState({}, '', '/');
+        // Token just saved, load gmail service from stored credential
+        const res  = await fetch(API.setupStatus);
+        const data = await res.json();
+        if (data.authenticated && data.email) {
+            showApp(data.email);
+            return;
+        }
+    }
+    if (params.get('oauth_error')) {
+        history.replaceState({}, '', '/');
+        showSetup();
+        goToStep(3);
+        const statusEl = document.getElementById('connect-status');
+        if (statusEl) {
+            statusEl.className = 'connect-status error';
+            statusEl.innerHTML = `✗ Authorization failed: ${params.get('oauth_error')}`;
+        }
+        return;
+    }
+
     try {
         const res  = await fetch(API.setupStatus);
         const data = await res.json();
 
-        if (data.credentialsConfigured && data.authenticated) {
-            // Both files exist on disk → jump straight to step 3 so user clicks Connect
-            showSetup();
-            goToStep(3);
+        if (data.authenticated && data.email) {
+            showApp(data.email);
         } else if (data.credentialsConfigured) {
-            // credentials.json exists but no token yet → step 3
             showSetup();
             goToStep(3);
         } else {
-            // No credentials at all → step 1
             showSetup();
         }
     } catch {
@@ -130,29 +149,22 @@ function showUploadError(msg) {
 }
 
 async function connectGmail() {
-    const btn        = document.getElementById('connect-btn');
-    const statusEl   = document.getElementById('connect-status');
+    const btn      = document.getElementById('connect-btn');
+    const statusEl = document.getElementById('connect-status');
 
     btn.disabled = true;
     statusEl.className = 'connect-status loading';
-    statusEl.innerHTML = '<div class="mini-spinner"></div><span>Waiting for browser authorization… check the window that just opened.</span>';
+    statusEl.innerHTML = '<div class="mini-spinner"></div><span>Redirecting to Google…</span>';
 
     try {
-        const res  = await fetch(API.connectGmail, { method: 'POST' });
+        const res  = await fetch(API.authUrl);
         const data = await res.json();
-
-        if (res.ok && data.success) {
-            statusEl.className = 'connect-status success';
-            statusEl.innerHTML = `✓ Connected as <strong>${data.email}</strong>`;
-            setTimeout(() => showApp(data.email), 1200);
-        } else {
-            statusEl.className = 'connect-status error';
-            statusEl.innerHTML = `✗ ${data.error || 'Authorization failed. Try again.'}`;
-            btn.disabled = false;
-        }
+        if (!res.ok) throw new Error(data.error || 'Failed to get auth URL');
+        // Redirect the current tab to Google's consent screen
+        window.location.href = data.url;
     } catch (e) {
         statusEl.className = 'connect-status error';
-        statusEl.innerHTML = `✗ Network error: ${e.message}`;
+        statusEl.innerHTML = `✗ ${e.message}`;
         btn.disabled = false;
     }
 }
