@@ -59,6 +59,10 @@ public class GoogleAuthService {
         }
     }
 
+    public void clearSession() {
+        this.gmail = null;
+    }
+
     public String getUserEmail() {
         if (gmail == null) return null;
         try {

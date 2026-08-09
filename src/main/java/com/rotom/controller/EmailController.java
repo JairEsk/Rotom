@@ -1,6 +1,8 @@
 package com.rotom.controller;
 
-import com.rotom.dto.EmailItem;
+import com.rotom.dto.DeleteRequest;
+import com.rotom.dto.DeleteResponse;
+import com.rotom.dto.EmailPage;
 import com.rotom.dto.TrashRequest;
 import com.rotom.dto.TrashResponse;
 import com.rotom.service.GoogleAuthService;
@@ -20,31 +22,21 @@ public class EmailController {
     private final GoogleAuthService googleAuthService;
 
     public EmailController(RotomMailService rotomMailService, GoogleAuthService googleAuthService) {
-        this.rotomMailService = rotomMailService;
+        this.rotomMailService  = rotomMailService;
         this.googleAuthService = googleAuthService;
     }
 
-    @GetMapping("/auth/status")
-    public Map<String, Object> getAuthStatus() {
-        Map<String, Object> status = new HashMap<>();
-        try {
-            boolean authenticated = googleAuthService.isAuthenticated();
-            status.put("authenticated", authenticated);
-            status.put("email", authenticated ? googleAuthService.getUserEmail() : null);
-        } catch (Exception e) {
-            status.put("authenticated", false);
-            status.put("email", null);
-            status.put("error", "Gmail not configured: " + e.getMessage());
-        }
-        return status;
-    }
-
     @GetMapping("/emails")
-    public ResponseEntity<?> getLargeEmails(@RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<?> getEmails(
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String pageToken) {
         try {
-            List<EmailItem> emails = rotomMailService.findLargeEmails(size);
-            return ResponseEntity.ok(emails);
+            String q = (query != null && !query.isBlank()) ? query : "larger:" + size + "M";
+            EmailPage page = rotomMailService.findEmails(q, pageToken);
+            return ResponseEntity.ok(page);
         } catch (Exception e) {
+            if (isAuthError(e)) return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
@@ -52,12 +44,40 @@ public class EmailController {
     @PostMapping("/emails/trash")
     public ResponseEntity<?> trashEmails(@RequestBody TrashRequest request) {
         if (request.getIds() == null || request.getIds().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Email IDs must not be null or empty"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Email IDs must not be empty"));
         }
         try {
             TrashResponse response = rotomMailService.trashEmails(request.getIds());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            if (isAuthError(e)) return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/emails/verify-trashed")
+    public ResponseEntity<?> verifyTrashed(@RequestBody TrashRequest request) {
+        if (request.getIds() == null || request.getIds().isEmpty()) {
+            return ResponseEntity.ok(Map.of("trashedIds", List.of()));
+        }
+        try {
+            List<String> confirmed = rotomMailService.verifyTrashed(request.getIds());
+            return ResponseEntity.ok(Map.of("trashedIds", confirmed));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/emails/delete")
+    public ResponseEntity<?> deleteForever(@RequestBody DeleteRequest request) {
+        if (request.getIds() == null || request.getIds().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email IDs must not be empty"));
+        }
+        try {
+            DeleteResponse response = rotomMailService.deleteEmailsPermanently(request.getIds());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            if (isAuthError(e)) return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
@@ -68,7 +88,14 @@ public class EmailController {
             Map<String, Object> storageInfo = rotomMailService.getStorageInfo();
             return ResponseEntity.ok(storageInfo);
         } catch (Exception e) {
+            if (isAuthError(e)) return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private boolean isAuthError(Exception e) {
+        String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        return msg.contains("token") || msg.contains("401") ||
+               msg.contains("unauthorized") || msg.contains("invalid_grant");
     }
 }

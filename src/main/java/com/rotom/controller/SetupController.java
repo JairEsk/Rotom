@@ -69,6 +69,19 @@ public class SetupController {
         }
     }
 
+    @PostMapping("/api/setup/logout")
+    public ResponseEntity<?> logout() {
+        try {
+            // Delete stored token so next visit triggers OAuth again
+            java.io.File tokenFile = new java.io.File("tokens/StoredCredential");
+            if (tokenFile.exists()) tokenFile.delete();
+            googleAuthService.clearSession();
+            return ResponseEntity.ok(Map.of("message", "Logged out"));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // Google redirects here after the user approves
     @GetMapping("/oauth2callback")
     public void oauthCallback(@RequestParam(value = "code", required = false) String code,

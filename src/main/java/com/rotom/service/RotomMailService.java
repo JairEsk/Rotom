@@ -5,7 +5,9 @@ import com.google.api.services.gmail.model.ListMessagesResponse;
 import com.google.api.services.gmail.model.Message;
 import com.google.api.services.gmail.model.MessagePartHeader;
 import com.google.api.services.gmail.model.Profile;
+import com.rotom.dto.DeleteResponse;
 import com.rotom.dto.EmailItem;
+import com.rotom.dto.EmailPage;
 import com.rotom.dto.TrashResponse;
 import org.springframework.stereotype.Service;
 
@@ -25,74 +27,65 @@ public class RotomMailService {
         this.googleAuthService = googleAuthService;
     }
 
-    public List<EmailItem> findLargeEmails(int minSizeMB) {
+    public EmailPage findEmails(String query, String pageToken) {
         try {
             Gmail gmail = googleAuthService.getGmailService();
-            String query = "larger:" + minSizeMB + "M";
 
-            ListMessagesResponse response = gmail.users().messages()
+            var listRequest = gmail.users().messages()
                     .list("me")
                     .setQ(query)
-                    .setMaxResults(50L)
-                    .execute();
+                    .setMaxResults(25L);
 
+            if (pageToken != null && !pageToken.isBlank()) {
+                listRequest.setPageToken(pageToken);
+            }
+
+            ListMessagesResponse response = listRequest.execute();
             List<Message> messages = response.getMessages();
+
             if (messages == null || messages.isEmpty()) {
-                return new ArrayList<>();
+                return new EmailPage(new ArrayList<>(), null);
             }
 
             List<EmailItem> emailItems = new ArrayList<>();
-
             for (Message msgRef : messages) {
-                Message msg = gmail.users().messages()
-                        .get("me", msgRef.getId())
-                        .setFormat("metadata")
-                        .setMetadataHeaders(Arrays.asList("Subject", "From", "Date"))
-                        .execute();
-
-                String subject = "";
-                String from = "";
-                String date = "";
-
-                if (msg.getPayload() != null && msg.getPayload().getHeaders() != null) {
-                    for (MessagePartHeader header : msg.getPayload().getHeaders()) {
-                        switch (header.getName()) {
-                            case "Subject":
-                                subject = header.getValue();
-                                break;
-                            case "From":
-                                from = header.getValue();
-                                break;
-                            case "Date":
-                                date = header.getValue();
-                                break;
-                        }
-                    }
-                }
-
-                long estimatedSize = msg.getSizeEstimate() != null ? msg.getSizeEstimate().longValue() : 0L;
-                String readableSize = EmailItem.formatSize(estimatedSize);
-                String snippet = msg.getSnippet() != null ? msg.getSnippet() : "";
-
-                EmailItem item = new EmailItem(
-                        msg.getId(),
-                        subject,
-                        from,
-                        date,
-                        snippet,
-                        estimatedSize,
-                        readableSize
-                );
-
-                emailItems.add(item);
+                emailItems.add(fetchEmailItem(gmail, msgRef.getId()));
             }
 
             emailItems.sort(Comparator.comparingLong(EmailItem::getEstimatedSize).reversed());
-
-            return emailItems;
+            return new EmailPage(emailItems, response.getNextPageToken());
         } catch (Exception e) {
-            throw new RuntimeException("Failed to find large emails: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to find emails: " + e.getMessage(), e);
         }
+    }
+
+    private EmailItem fetchEmailItem(Gmail gmail, String messageId) throws Exception {
+        Message msg = gmail.users().messages()
+                .get("me", messageId)
+                .setFormat("metadata")
+                .setMetadataHeaders(Arrays.asList("Subject", "From", "Date"))
+                .execute();
+
+        String subject = "", from = "", date = "";
+        if (msg.getPayload() != null && msg.getPayload().getHeaders() != null) {
+            for (MessagePartHeader h : msg.getPayload().getHeaders()) {
+                switch (h.getName()) {
+                    case "Subject" -> subject = h.getValue();
+                    case "From"    -> from    = h.getValue();
+                    case "Date"    -> date    = h.getValue();
+                }
+            }
+        }
+
+        long size = msg.getSizeEstimate() != null ? msg.getSizeEstimate().longValue() : 0L;
+        return new EmailItem(msg.getId(), subject, from, date,
+                msg.getSnippet() != null ? msg.getSnippet() : "",
+                size, EmailItem.formatSize(size));
+    }
+
+    // Keep old method as a convenience wrapper for backward compat
+    public EmailPage findLargeEmails(int minSizeMB, String pageToken) {
+        return findEmails("larger:" + minSizeMB + "M", pageToken);
     }
 
     public TrashResponse trashEmails(List<String> messageIds) {
@@ -113,6 +106,37 @@ public class RotomMailService {
                 trashedCount, failedCount);
 
         return new TrashResponse(trashedCount, failedCount, message);
+    }
+
+    public DeleteResponse deleteEmailsPermanently(List<String> messageIds) {
+        Gmail gmail = googleAuthService.getGmailService();
+        int deleted = 0, failed = 0;
+        for (String id : messageIds) {
+            try {
+                gmail.users().messages().delete("me", id).execute();
+                deleted++;
+            } catch (Exception e) {
+                failed++;
+            }
+        }
+        return new DeleteResponse(deleted, failed,
+                String.format("Permanently deleted %d email(s). %d failed.", deleted, failed));
+    }
+
+    // Returns the IDs that are confirmed in TRASH label
+    public List<String> verifyTrashed(List<String> messageIds) {
+        Gmail gmail = googleAuthService.getGmailService();
+        List<String> confirmed = new ArrayList<>();
+        for (String id : messageIds) {
+            try {
+                Message msg = gmail.users().messages()
+                        .get("me", id).setFormat("minimal").execute();
+                if (msg.getLabelIds() != null && msg.getLabelIds().contains("TRASH")) {
+                    confirmed.add(id);
+                }
+            } catch (Exception ignored) {}
+        }
+        return confirmed;
     }
 
     public Map<String, Object> getStorageInfo() {

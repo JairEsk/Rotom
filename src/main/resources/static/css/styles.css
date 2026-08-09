@@ -321,7 +321,7 @@ table {
 }
 
 thead {
-    background: var(--secondary);
+    background: rgba(0, 163, 255, 0.12);
 }
 
 th {
@@ -331,7 +331,7 @@ th {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--text-muted);
+    color: var(--secondary);
     border-bottom: 2px solid var(--border);
 }
 
@@ -666,6 +666,183 @@ code {
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     flex-shrink: 0;
+}
+
+/* ---------- Storage Banner ---------- */
+.storage-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 1.25rem;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.storage-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.storage-divider { color: var(--border); }
+
+.storage-recoverable {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+
+.recoverable-value {
+    color: var(--success);
+    font-weight: 700;
+}
+
+.storage-hint { color: var(--text-muted); }
+
+/* ---------- Filter groups ---------- */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.filter-group label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.filter-group select,
+.filter-group input[type="text"] {
+    min-width: 120px;
+}
+
+.filter-group--wide select,
+.filter-group--wide input[type="text"] {
+    min-width: 160px;
+}
+
+input[type="text"] {
+    background: var(--bg-surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-family: var(--font);
+    transition: border-color var(--transition);
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+input[type="text"]::placeholder {
+    color: var(--text-muted);
+}
+
+/* ---------- Load More ---------- */
+.load-more-area {
+    display: flex;
+    justify-content: center;
+    padding: 1.25rem 0 0.5rem;
+}
+
+.load-more-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.spinner-small {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+/* ---------- Delete Forever button ---------- */
+.btn-delete {
+    background: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+}
+
+.btn-delete:hover:not(:disabled) {
+    background: rgba(231, 76, 60, 0.15);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+}
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+}
+
+.modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--error);
+    border-radius: var(--radius);
+    padding: 2rem;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+.modal h3 {
+    font-size: 1.15rem;
+    color: var(--error);
+    margin-bottom: 0.75rem;
+}
+
+.modal p {
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+}
+
+.modal-warning {
+    color: var(--error) !important;
+    font-size: 0.85rem !important;
+    background: rgba(231, 76, 60, 0.1);
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    border-left: 3px solid var(--error);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+/* Error state button */
+.error-state .btn {
+    margin-top: 1rem;
 }
 
 /* ---------- Responsive ---------- */
