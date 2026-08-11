@@ -43,42 +43,54 @@ let emails        = [];
 let selectedIds   = new Set();
 let nextPageToken = null;
 let currentQuery  = '';
-let lastPageCount = 0; // tracks how many items the last page returned
+let lastPageCount = 0;
+let hasMorePages  = false;
+
+const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-filter'];
 
 // ─── Boot — wire all static listeners once ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Auth screen
   document.getElementById('sign-in-btn').addEventListener('click', signIn);
-
-  // App screen — static buttons
   document.getElementById('scan-btn').addEventListener('click', scanEmails);
   document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
-  document.getElementById('trash-btn').addEventListener('click', trashSelected);
+  document.getElementById('trash-btn').addEventListener('click', openTrashModal);
   document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
   document.getElementById('header-checkbox').addEventListener('change', toggleSelectAll);
   document.getElementById('sign-out-btn').addEventListener('click', signOut);
-
-  // Error / load-more (fixed: was using blocked onclick attributes)
   document.getElementById('retry-btn').addEventListener('click', scanEmails);
   document.getElementById('load-more-btn').addEventListener('click', loadMore);
-
-  // Modal (fixed: was using blocked onclick attributes)
+  document.getElementById('cancel-trash-btn').addEventListener('click', closeTrashModal);
+  document.getElementById('confirm-trash-btn').addEventListener('click', confirmTrash);
   document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
   document.getElementById('confirm-delete-btn').addEventListener('click', confirmDeleteForever);
+
+  // Persist filters on change
+  FILTER_KEYS.forEach(id => {
+    document.getElementById(id).addEventListener('change', saveFilters);
+    document.getElementById(id).addEventListener('input', saveFilters);
+  });
 
   init();
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
+  await restoreFilters();
   token = await getToken(false);
   if (token) {
     try {
       const profile = await gmailGet('profile', token);
       showApp(profile.emailAddress, profile.messagesTotal);
     } catch (e) {
-      if (e instanceof AuthError) { token = null; showAuth(); }
-      else showApp('', 0);
+      if (e instanceof AuthError) {
+        token = null;
+        showAuth();
+      } else {
+        // Network/API error — show app but surface the problem clearly
+        showApp('', 0);
+        showError('Could not load profile: ' + e.message);
+        show('error-state');
+      }
     }
   } else {
     showAuth();
@@ -111,10 +123,9 @@ async function signOut() {
     try {
       await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' });
     } catch {}
-    // Fixed: capture token before nulling so removeCachedAuthToken actually works
     chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
-  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0;
+  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
   showAuth();
 }
 
@@ -131,14 +142,32 @@ function getToken(interactive) {
 function showApp(email, totalMessages) {
   hide('auth-screen');
   show('app-screen');
-
   if (email) document.getElementById('user-email').textContent = email;
-
   if (totalMessages) {
     document.getElementById('storage-messages').textContent =
-      `${Number(totalMessages).toLocaleString()} messages`;
+      `${Number(totalMessages).toLocaleString()} total messages`;
     show('storage-banner');
   }
+}
+
+// ─── Filter persistence ───────────────────────────────────────────────────────
+function saveFilters() {
+  const data = {};
+  FILTER_KEYS.forEach(id => { data[id] = document.getElementById(id).value; });
+  chrome.storage.local.set({ filters: data });
+}
+
+async function restoreFilters() {
+  return new Promise(resolve => {
+    chrome.storage.local.get('filters', ({ filters }) => {
+      if (!filters) { resolve(); return; }
+      FILTER_KEYS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && filters[id] !== undefined) el.value = filters[id];
+      });
+      resolve();
+    });
+  });
 }
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
@@ -156,7 +185,7 @@ function buildQuery() {
 
 // ─── Scan ─────────────────────────────────────────────────────────────────────
 async function scanEmails() {
-  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0;
+  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
   currentQuery = buildQuery();
   hideSection();
   show('loading');
@@ -168,8 +197,12 @@ async function loadMore() {
   if (!nextPageToken) return;
   hide('load-more-area');
   show('load-more-loading');
-  await fetchPage(false);
-  hide('load-more-loading');
+  try {
+    await fetchPage(false);
+  } finally {
+    // Fixed: always hide loading spinner; fetchPage re-shows the button if needed
+    hide('load-more-loading');
+  }
 }
 
 async function fetchPage(isFirst) {
@@ -188,26 +221,36 @@ async function fetchPage(isFirst) {
     const items = await fetchMetadataBatch(listRes.messages);
     items.sort((a, b) => b.estimatedSize - a.estimatedSize);
 
-    lastPageCount = items.length; // track for correct slice in renderEmails
+    lastPageCount = items.length;
     emails.push(...items);
-    nextPageToken = listRes.nextPageToken || null;
+    nextPageToken  = listRes.nextPageToken || null;
+    hasMorePages   = !!nextPageToken;
 
     renderEmails(isFirst);
     show('results');
     show('actions-bar');
-    document.getElementById('email-count').textContent = emails.length;
-    document.getElementById('total-size').textContent =
-      formatBytes(emails.reduce((s, e) => s + e.estimatedSize, 0));
+    updateResultsHeader();
 
-    document.getElementById('load-more-area').style.display =
-      nextPageToken ? 'flex' : 'none';
+    document.getElementById('load-more-area').style.display = hasMorePages ? 'flex' : 'none';
 
   } catch (e) {
     if (isFirst) hide('loading');
     if (e instanceof AuthError) { handleSessionExpired(); return; }
     if (isFirst) showError(e.message);
-    else showToast('Error loading more: ' + e.message, true);
+    else {
+      // Fixed: re-show load-more button so user can retry
+      document.getElementById('load-more-area').style.display = hasMorePages ? 'flex' : 'none';
+      showToast('Error loading more: ' + e.message, true);
+    }
   }
+}
+
+function updateResultsHeader() {
+  const count = emails.length;
+  const label = hasMorePages ? `${count}+` : `${count}`;
+  document.getElementById('email-count').textContent = label;
+  document.getElementById('total-size').textContent =
+    formatBytes(emails.reduce((s, e) => s + e.estimatedSize, 0));
 }
 
 async function fetchMetadataBatch(msgs) {
@@ -226,13 +269,14 @@ async function fetchEmailItem(id) {
     format: 'metadata',
     metadataHeaders: 'Subject,From,Date'
   });
-  let subject = '', from = '';
+  let subject = '', from = '', date = '';
   (msg.payload?.headers || []).forEach(h => {
     if (h.name === 'Subject') subject = h.value;
     if (h.name === 'From')    from    = h.value;
+    if (h.name === 'Date')    date    = h.value;
   });
   const size = msg.sizeEstimate || 0;
-  return { id: msg.id, subject, from, estimatedSize: size, readableSize: formatBytes(size) };
+  return { id: msg.id, subject, from, date, estimatedSize: size, readableSize: formatBytes(size) };
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -240,29 +284,45 @@ function renderEmails(replace) {
   const body = document.getElementById('email-body');
   if (replace) {
     body.innerHTML = '';
-    // Full replace: render all
     emails.forEach(email => appendEmailRow(body, email));
   } else {
-    // Fixed: use lastPageCount so we don't re-render already-shown items
-    const newItems = emails.slice(emails.length - lastPageCount);
-    newItems.forEach(email => appendEmailRow(body, email));
+    // Fixed: use lastPageCount to only append the newly fetched items
+    emails.slice(emails.length - lastPageCount).forEach(email => appendEmailRow(body, email));
+    // Fixed: reconcile header checkbox state after appending new (unchecked) rows
+    syncHeaderCheckbox();
   }
 }
 
 function appendEmailRow(body, email) {
   const tr = document.createElement('tr');
   tr.dataset.id = email.id;
+
+  // Format date compactly
+  const dateStr = email.date ? formatDate(email.date) : '';
+  // Gmail web link for this message
+  const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
+
   tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
-    <td class="from-cell"    title="${escHtml(email.from)}">${escHtml(email.from)}</td>
-    <td class="subject-cell" title="${escHtml(email.subject)}">${escHtml(email.subject)}</td>
+    <td class="from-cell" title="${escHtml(email.from)}">${escHtml(email.from)}</td>
+    <td class="subject-cell" title="${escHtml(email.subject)}">
+      <a class="subject-link" href="${gmailLink}" target="_blank">${escHtml(email.subject) || '<em>no subject</em>'}</a>
+    </td>
+    <td class="date-cell" title="${escHtml(email.date)}">${escHtml(dateStr)}</td>
     <td class="size-cell">${escHtml(email.readableSize)}</td>
   `;
   tr.querySelector('.email-check').addEventListener('change', e => {
     e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
+    syncHeaderCheckbox();
     updateSelection();
   });
   body.appendChild(tr);
+}
+
+function syncHeaderCheckbox() {
+  const hdr = document.getElementById('header-checkbox');
+  hdr.checked = emails.length > 0 && selectedIds.size === emails.length;
+  hdr.indeterminate = selectedIds.size > 0 && selectedIds.size < emails.length;
 }
 
 function toggleSelectAll() {
@@ -271,12 +331,11 @@ function toggleSelectAll() {
   if (allSel) {
     selectedIds.clear();
     cbs.forEach(cb => cb.checked = false);
-    document.getElementById('header-checkbox').checked = false;
   } else {
     emails.forEach(e => selectedIds.add(e.id));
     cbs.forEach(cb => cb.checked = true);
-    document.getElementById('header-checkbox').checked = true;
   }
+  syncHeaderCheckbox();
   updateSelection();
 }
 
@@ -297,14 +356,21 @@ function updateSelection() {
   }
 }
 
-// ─── Trash ────────────────────────────────────────────────────────────────────
-async function trashSelected() {
+// ─── Trash modal ──────────────────────────────────────────────────────────────
+function openTrashModal() {
   if (selectedIds.size === 0) return;
+  document.getElementById('trash-count').textContent = selectedIds.size;
+  show('trash-modal');
+}
+
+function closeTrashModal() { hide('trash-modal'); }
+
+async function confirmTrash() {
   const ids = Array.from(selectedIds);
+  closeTrashModal();
   const btn = document.getElementById('trash-btn');
   btn.disabled = true; btn.textContent = 'Trashing…';
   try {
-    // Fixed: allSettled so partial failures don't discard successful operations
     const results = await Promise.allSettled(
       ids.map(id => gmailPost(`messages/${id}/trash`, token, {}))
     );
@@ -336,7 +402,6 @@ async function confirmDeleteForever() {
   const btn = document.getElementById('delete-btn');
   btn.disabled = true; btn.textContent = 'Deleting…';
   try {
-    // Fixed: allSettled so partial failures don't discard successful operations
     const results = await Promise.allSettled(
       ids.map(id => gmailDelete(`messages/${id}`, token))
     );
@@ -356,7 +421,6 @@ async function confirmDeleteForever() {
 // ─── Session expiry ───────────────────────────────────────────────────────────
 function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
-  // Fixed: capture token before nulling it so removeCachedAuthToken works
   const oldToken = token;
   token = null;
   chrome.identity.removeCachedAuthToken({ token: oldToken });
@@ -375,10 +439,9 @@ function removeFromList(ids) {
     hideSection(); show('empty-state');
     hide('actions-bar'); hide('load-more-area');
   } else {
-    document.getElementById('email-count').textContent = emails.length;
-    document.getElementById('total-size').textContent =
-      formatBytes(emails.reduce((s, e) => s + e.estimatedSize, 0));
+    updateResultsHeader();
   }
+  syncHeaderCheckbox();
   updateSelection();
 }
 
@@ -412,6 +475,22 @@ function formatBytes(b) {
   const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(b) / Math.log(k));
   return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
+}
+
+function formatDate(raw) {
+  if (!raw) return '';
+  try {
+    const d = new Date(raw);
+    const now = new Date();
+    const diff = now - d;
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 365) return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+  } catch {
+    return '';
+  }
 }
 
 function escHtml(t) {

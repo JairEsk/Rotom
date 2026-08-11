@@ -334,9 +334,10 @@ tbody tr:hover { background: var(--hover); }
 tbody tr:nth-child(even) { background: rgba(0,163,255,0.03); }
 tbody tr:nth-child(even):hover { background: var(--hover); }
 
-.col-check { width: 32px; text-align: center; }
-.col-from  { width: 28%; }
-.col-size  { width: 72px; text-align: right; white-space: nowrap; }
+.col-check   { width: 32px; text-align: center; }
+.col-from    { width: 24%; }
+.col-date    { width: 68px; text-align: right; white-space: nowrap; }
+.col-size    { width: 62px; text-align: right; white-space: nowrap; }
 
 td.from-cell, td.subject-cell {
   max-width: 0;
@@ -345,9 +346,19 @@ td.from-cell, td.subject-cell {
   white-space: nowrap;
 }
 
-td.size-cell { text-align: right; font-weight: 600; color: var(--accent); white-space: nowrap; }
-td.from-cell { max-width: 130px; }
-td.subject-cell { max-width: 200px; }
+td.size-cell  { text-align: right; font-weight: 600; color: var(--accent); white-space: nowrap; }
+td.date-cell  { text-align: right; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+td.from-cell    { max-width: 110px; }
+td.subject-cell { max-width: 180px; }
+
+.subject-link {
+  color: var(--text);
+  text-decoration: none;
+}
+.subject-link:hover {
+  color: var(--blue-h);
+  text-decoration: underline;
+}
 
 input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
 
@@ -384,7 +395,7 @@ input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent);
 
 .modal {
   background: var(--bg2);
-  border: 1px solid var(--error);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.5rem;
   max-width: 340px;
@@ -392,8 +403,19 @@ input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent);
   box-shadow: 0 8px 32px rgba(0,0,0,0.6);
 }
 
+#delete-modal .modal { border-color: var(--error); }
+
 .modal h3 { font-size: 1rem; color: var(--error); margin-bottom: 0.6rem; }
 .modal p { font-size: 0.85rem; color: var(--text); margin-bottom: 0.4rem; line-height: 1.55; }
+.modal-note {
+  color: var(--muted) !important;
+  font-size: 0.8rem !important;
+  background: rgba(0,163,255,0.06);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--blue);
+}
+
 .modal-warning {
   color: var(--error) !important;
   font-size: 0.8rem !important;

@@ -117,6 +117,7 @@
             <th class="col-check"><input type="checkbox" id="header-checkbox"></th>
             <th class="col-from">From</th>
             <th class="col-subject">Subject</th>
+            <th class="col-date">Date</th>
             <th class="col-size">Size</th>
           </tr>
         </thead>
@@ -127,6 +128,19 @@
       </div>
       <div id="load-more-loading" class="load-more-loading" style="display:none;">
         <div class="spinner-sm"></div> Loading…
+      </div>
+    </div>
+  </div>
+
+  <!-- Trash modal -->
+  <div id="trash-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>Move to Trash?</h3>
+      <p>You are about to trash <strong><span id="trash-count">0</span> email(s)</strong>.</p>
+      <p class="modal-note">Emails stay in Trash for 30 days before being auto-deleted. You can recover them from Gmail.</p>
+      <div class="modal-actions">
+        <button id="cancel-trash-btn" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-trash-btn" class="btn btn-danger">Yes, trash them</button>
       </div>
     </div>
   </div>
