@@ -103,7 +103,7 @@
 
     <div id="error-state" class="state-box state-error" style="display:none;">
       <p id="error-message"></p>
-      <button class="btn btn-secondary btn-sm" onclick="scanEmails()">Retry</button>
+      <button id="retry-btn" class="btn btn-secondary btn-sm">Retry</button>
     </div>
 
     <!-- Results table -->
@@ -123,7 +123,7 @@
         <tbody id="email-body"></tbody>
       </table>
       <div id="load-more-area" class="load-more-area" style="display:none;">
-        <button id="load-more-btn" class="btn btn-secondary btn-sm" onclick="loadMore()">Load more</button>
+        <button id="load-more-btn" class="btn btn-secondary btn-sm">Load more</button>
       </div>
       <div id="load-more-loading" class="load-more-loading" style="display:none;">
         <div class="spinner-sm"></div> Loading…
@@ -138,8 +138,8 @@
       <p>You are about to <strong>permanently delete</strong> <span id="delete-count">0</span> email(s).</p>
       <p class="modal-warning">This <strong>cannot be undone</strong>. Emails won't go to Trash.</p>
       <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-delete" id="confirm-delete-btn" onclick="confirmDeleteForever()">Yes, delete forever</button>
+        <button id="cancel-delete-btn" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-delete-btn" class="btn btn-delete">Yes, delete forever</button>
       </div>
     </div>
   </div>

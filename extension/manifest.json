@@ -22,8 +22,7 @@
     "service_worker": "background.js"
   },
   "permissions": [
-    "identity",
-    "storage"
+    "identity"
   ],
   "host_permissions": [
     "https://www.googleapis.com/*",
@@ -33,7 +32,6 @@
     "client_id": "YOUR_CHROME_OAUTH_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/gmail.modify",
-      "https://www.googleapis.com/auth/gmail.readonly",
       "email",
       "profile"
     ]

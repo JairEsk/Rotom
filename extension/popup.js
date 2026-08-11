@@ -3,7 +3,9 @@ const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 async function gmailGet(path, token, params = {}) {
   const url = new URL(`${GMAIL}/${path}`);
-  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') url.searchParams.set(k, v); });
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== '') url.searchParams.set(k, v);
+  });
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 401) throw new AuthError();
   if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API error'); }
@@ -27,7 +29,10 @@ async function gmailDelete(path, token) {
     headers: { Authorization: `Bearer ${token}` }
   });
   if (res.status === 401) throw new AuthError();
-  if (!res.ok && res.status !== 204) { const e = await res.json(); throw new Error(e.error?.message || 'API error'); }
+  if (!res.ok && res.status !== 204) {
+    const e = await res.json();
+    throw new Error(e.error?.message || 'API error');
+  }
 }
 
 class AuthError extends Error { constructor() { super('auth'); } }
@@ -38,12 +43,34 @@ let emails        = [];
 let selectedIds   = new Set();
 let nextPageToken = null;
 let currentQuery  = '';
+let lastPageCount = 0; // tracks how many items the last page returned
 
-// ─── Boot ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', init);
+// ─── Boot — wire all static listeners once ───────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Auth screen
+  document.getElementById('sign-in-btn').addEventListener('click', signIn);
 
+  // App screen — static buttons
+  document.getElementById('scan-btn').addEventListener('click', scanEmails);
+  document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
+  document.getElementById('trash-btn').addEventListener('click', trashSelected);
+  document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
+  document.getElementById('header-checkbox').addEventListener('change', toggleSelectAll);
+  document.getElementById('sign-out-btn').addEventListener('click', signOut);
+
+  // Error / load-more (fixed: was using blocked onclick attributes)
+  document.getElementById('retry-btn').addEventListener('click', scanEmails);
+  document.getElementById('load-more-btn').addEventListener('click', loadMore);
+
+  // Modal (fixed: was using blocked onclick attributes)
+  document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
+  document.getElementById('confirm-delete-btn').addEventListener('click', confirmDeleteForever);
+
+  init();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
-  // Try to restore a cached token (non-interactive)
   token = await getToken(false);
   if (token) {
     try {
@@ -62,7 +89,6 @@ async function init() {
 function showAuth() {
   show('auth-screen');
   hide('app-screen');
-  document.getElementById('sign-in-btn').addEventListener('click', signIn);
 }
 
 async function signIn() {
@@ -80,11 +106,15 @@ async function signIn() {
 
 async function signOut() {
   if (token) {
-    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' }); } catch {}
-    chrome.identity.removeCachedAuthToken({ token });
+    const oldToken = token;
     token = null;
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' });
+    } catch {}
+    // Fixed: capture token before nulling so removeCachedAuthToken actually works
+    chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
-  emails = []; selectedIds.clear(); nextPageToken = null;
+  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0;
   showAuth();
 }
 
@@ -109,13 +139,6 @@ function showApp(email, totalMessages) {
       `${Number(totalMessages).toLocaleString()} messages`;
     show('storage-banner');
   }
-
-  document.getElementById('sign-out-btn').addEventListener('click', signOut);
-  document.getElementById('scan-btn').addEventListener('click', scanEmails);
-  document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
-  document.getElementById('trash-btn').addEventListener('click', trashSelected);
-  document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
-  document.getElementById('header-checkbox').addEventListener('change', toggleSelectAll);
 }
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
@@ -133,12 +156,11 @@ function buildQuery() {
 
 // ─── Scan ─────────────────────────────────────────────────────────────────────
 async function scanEmails() {
-  emails = []; selectedIds.clear(); nextPageToken = null;
+  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0;
   currentQuery = buildQuery();
   hideSection();
   show('loading');
   hide('actions-bar');
-  hide('load-more-area');
   await fetchPage(true);
 }
 
@@ -163,11 +185,10 @@ async function fetchPage(isFirst) {
       return;
     }
 
-    // Fetch metadata for each message in parallel (batched 5 at a time to avoid rate limits)
-    const batch = listRes.messages;
-    const items = await fetchMetadataBatch(batch);
-
+    const items = await fetchMetadataBatch(listRes.messages);
     items.sort((a, b) => b.estimatedSize - a.estimatedSize);
+
+    lastPageCount = items.length; // track for correct slice in renderEmails
     emails.push(...items);
     nextPageToken = listRes.nextPageToken || null;
 
@@ -205,43 +226,49 @@ async function fetchEmailItem(id) {
     format: 'metadata',
     metadataHeaders: 'Subject,From,Date'
   });
-  let subject = '', from = '', date = '';
+  let subject = '', from = '';
   (msg.payload?.headers || []).forEach(h => {
     if (h.name === 'Subject') subject = h.value;
     if (h.name === 'From')    from    = h.value;
-    if (h.name === 'Date')    date    = h.value;
   });
   const size = msg.sizeEstimate || 0;
-  return { id: msg.id, subject, from, date, estimatedSize: size, readableSize: formatBytes(size) };
+  return { id: msg.id, subject, from, estimatedSize: size, readableSize: formatBytes(size) };
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function renderEmails(replace) {
   const body = document.getElementById('email-body');
-  if (replace) body.innerHTML = '';
+  if (replace) {
+    body.innerHTML = '';
+    // Full replace: render all
+    emails.forEach(email => appendEmailRow(body, email));
+  } else {
+    // Fixed: use lastPageCount so we don't re-render already-shown items
+    const newItems = emails.slice(emails.length - lastPageCount);
+    newItems.forEach(email => appendEmailRow(body, email));
+  }
+}
 
-  const slice = replace ? emails : emails.slice(-25);
-  slice.forEach(email => {
-    const tr = document.createElement('tr');
-    tr.dataset.id = email.id;
-    tr.innerHTML = `
-      <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
-      <td class="from-cell"    title="${escHtml(email.from)}">${escHtml(email.from)}</td>
-      <td class="subject-cell" title="${escHtml(email.subject)}">${escHtml(email.subject)}</td>
-      <td class="size-cell">${escHtml(email.readableSize)}</td>
-    `;
-    tr.querySelector('.email-check').addEventListener('change', e => {
-      e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
-      updateSelection();
-    });
-    body.appendChild(tr);
+function appendEmailRow(body, email) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = email.id;
+  tr.innerHTML = `
+    <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
+    <td class="from-cell"    title="${escHtml(email.from)}">${escHtml(email.from)}</td>
+    <td class="subject-cell" title="${escHtml(email.subject)}">${escHtml(email.subject)}</td>
+    <td class="size-cell">${escHtml(email.readableSize)}</td>
+  `;
+  tr.querySelector('.email-check').addEventListener('change', e => {
+    e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
+    updateSelection();
   });
+  body.appendChild(tr);
 }
 
 function toggleSelectAll() {
-  const cbs     = document.querySelectorAll('.email-check');
-  const allDone = selectedIds.size === emails.length;
-  if (allDone) {
+  const cbs    = document.querySelectorAll('.email-check');
+  const allSel = selectedIds.size === emails.length && emails.length > 0;
+  if (allSel) {
     selectedIds.clear();
     cbs.forEach(cb => cb.checked = false);
     document.getElementById('header-checkbox').checked = false;
@@ -259,10 +286,10 @@ function updateSelection() {
   document.getElementById('trash-btn').disabled  = n === 0;
   document.getElementById('delete-btn').disabled = n === 0;
 
-  // Recoverable size
-  const total = emails.filter(e => selectedIds.has(e.id)).reduce((s, e) => s + e.estimatedSize, 0);
-  const rec   = document.getElementById('storage-recoverable');
+  const rec = document.getElementById('storage-recoverable');
   if (n > 0) {
+    const total = emails.filter(e => selectedIds.has(e.id))
+                        .reduce((s, e) => s + e.estimatedSize, 0);
     document.getElementById('recoverable-size').textContent = formatBytes(total);
     rec.style.display = 'inline';
   } else {
@@ -277,12 +304,18 @@ async function trashSelected() {
   const btn = document.getElementById('trash-btn');
   btn.disabled = true; btn.textContent = 'Trashing…';
   try {
-    await Promise.all(ids.map(id => gmailPost(`messages/${id}/trash`, token, {})));
-    showToast(`${ids.length} email(s) moved to Trash ✓`);
-    removeFromList(ids);
-  } catch (e) {
-    if (e instanceof AuthError) { handleSessionExpired(); return; }
-    showToast('Error: ' + e.message, true);
+    // Fixed: allSettled so partial failures don't discard successful operations
+    const results = await Promise.allSettled(
+      ids.map(id => gmailPost(`messages/${id}/trash`, token, {}))
+    );
+    const succeeded = ids.filter((_, i) => results[i].status === 'fulfilled');
+    const failed    = ids.length - succeeded.length;
+
+    if (succeeded.length) removeFromList(succeeded);
+    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash ✓`);
+    else if (succeeded.length && failed) showToast(`${succeeded.length} trashed, ${failed} failed.`, true);
+    else if (results[0]?.reason instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + (results[0]?.reason?.message || 'Unknown error'), true);
   } finally {
     btn.disabled = false; btn.textContent = 'Trash';
   }
@@ -303,12 +336,18 @@ async function confirmDeleteForever() {
   const btn = document.getElementById('delete-btn');
   btn.disabled = true; btn.textContent = 'Deleting…';
   try {
-    await Promise.all(ids.map(id => gmailDelete(`messages/${id}`, token)));
-    showToast(`${ids.length} email(s) permanently deleted.`);
-    removeFromList(ids);
-  } catch (e) {
-    if (e instanceof AuthError) { handleSessionExpired(); return; }
-    showToast('Error: ' + e.message, true);
+    // Fixed: allSettled so partial failures don't discard successful operations
+    const results = await Promise.allSettled(
+      ids.map(id => gmailDelete(`messages/${id}`, token))
+    );
+    const succeeded = ids.filter((_, i) => results[i].status === 'fulfilled');
+    const failed    = ids.length - succeeded.length;
+
+    if (succeeded.length) removeFromList(succeeded);
+    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) permanently deleted.`);
+    else if (succeeded.length && failed) showToast(`${succeeded.length} deleted, ${failed} failed.`, true);
+    else if (results[0]?.reason instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + (results[0]?.reason?.message || 'Unknown error'), true);
   } finally {
     btn.disabled = false; btn.textContent = 'Delete Forever';
   }
@@ -317,19 +356,20 @@ async function confirmDeleteForever() {
 // ─── Session expiry ───────────────────────────────────────────────────────────
 function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
+  // Fixed: capture token before nulling it so removeCachedAuthToken works
+  const oldToken = token;
   token = null;
-  chrome.identity.removeCachedAuthToken({ token });
-  setTimeout(() => { showAuth(); }, 2200);
+  chrome.identity.removeCachedAuthToken({ token: oldToken });
+  setTimeout(showAuth, 2200);
 }
 
-// ─── DOM helpers ──────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function removeFromList(ids) {
   const s = new Set(ids);
   emails = emails.filter(e => !s.has(e.id));
   ids.forEach(id => {
     selectedIds.delete(id);
-    const row = document.querySelector(`tr[data-id="${id}"]`);
-    if (row) row.remove();
+    document.querySelector(`tr[data-id="${id}"]`)?.remove();
   });
   if (emails.length === 0) {
     hideSection(); show('empty-state');
@@ -343,7 +383,7 @@ function removeFromList(ids) {
 }
 
 function hideSection() {
-  ['loading','results','empty-state','error-state'].forEach(hide);
+  ['loading', 'results', 'empty-state', 'error-state'].forEach(hide);
 }
 
 function showError(msg) {
@@ -359,13 +399,17 @@ function showToast(msg, isError = false) {
   setTimeout(() => { t.style.display = 'none'; }, 4000);
 }
 
-function show(id)    { document.getElementById(id).style.display = ''; }
-function hide(id)    { document.getElementById(id).style.display = 'none'; }
-function showEl(id, text) { const el = document.getElementById(id); el.textContent = text; el.style.display = 'block'; }
+function show(id) { document.getElementById(id).style.display = ''; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+function showEl(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.style.display = 'block';
+}
 
 function formatBytes(b) {
   if (!b) return '0 B';
-  const k = 1024, s = ['B','KB','MB','GB'];
+  const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(b) / Math.log(k));
   return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
 }
