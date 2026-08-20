@@ -176,7 +176,8 @@ function buildQuery() {
   const category = document.getElementById('category-filter').value;
   const date     = document.getElementById('date-filter').value;
   const sender   = document.getElementById('sender-filter').value.trim();
-  const parts    = [`larger:${size}M`];
+  const parts    = [];
+  if (size)     parts.push(`larger:${size}M`);
   if (category) parts.push(category);
   if (date)     parts.push(date);
   if (sender)   parts.push(`from:${sender}`);
@@ -499,3 +500,4 @@ function escHtml(t) {
   d.textContent = t;
   return d.innerHTML;
 }
+
