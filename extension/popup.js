@@ -371,19 +371,42 @@ async function confirmTrash() {
   const ids = Array.from(selectedIds);
   closeTrashModal();
   const btn = document.getElementById('trash-btn');
-  btn.disabled = true; btn.textContent = 'Trashing…';
+  btn.disabled = true;
+  
+  const total = ids.length;
+  let processed = 0;
+  let succeeded = [];
+  let firstError = null;
+
   try {
-    const results = await Promise.allSettled(
-      ids.map(id => gmailPost(`messages/${id}/trash`, token, {}))
-    );
-    const succeeded = ids.filter((_, i) => results[i].status === 'fulfilled');
-    const failed    = ids.length - succeeded.length;
+    for (let i = 0; i < total; i += 5) {
+      const chunk = ids.slice(i, i + 5);
+      btn.textContent = `Trashing (${processed}/${total})…`;
+      
+      const results = await Promise.allSettled(
+        chunk.map(id => gmailPost(`messages/${id}/trash`, token, {}))
+      );
+      
+      chunk.forEach((id, idx) => {
+        if (results[idx].status === 'fulfilled') {
+          succeeded.push(id);
+        } else if (!firstError) {
+          firstError = results[idx].reason;
+        }
+      });
+      
+      processed += chunk.length;
+    }
+    
+    btn.textContent = `Trashing (${processed}/${total})…`;
+
+    const failed = total - succeeded.length;
 
     if (succeeded.length) removeFromList(succeeded);
     if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash ✓`);
     else if (succeeded.length && failed) showToast(`${succeeded.length} trashed, ${failed} failed.`, true);
-    else if (results[0]?.reason instanceof AuthError) { handleSessionExpired(); return; }
-    else showToast('Error: ' + (results[0]?.reason?.message || 'Unknown error'), true);
+    else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
   } finally {
     btn.disabled = false; btn.textContent = 'Trash';
   }
@@ -402,19 +425,42 @@ async function confirmDeleteForever() {
   const ids = Array.from(selectedIds);
   closeDeleteModal();
   const btn = document.getElementById('delete-btn');
-  btn.disabled = true; btn.textContent = 'Deleting…';
+  btn.disabled = true;
+  
+  const total = ids.length;
+  let processed = 0;
+  let succeeded = [];
+  let firstError = null;
+
   try {
-    const results = await Promise.allSettled(
-      ids.map(id => gmailDelete(`messages/${id}`, token))
-    );
-    const succeeded = ids.filter((_, i) => results[i].status === 'fulfilled');
-    const failed    = ids.length - succeeded.length;
+    for (let i = 0; i < total; i += 5) {
+      const chunk = ids.slice(i, i + 5);
+      btn.textContent = `Deleting (${processed}/${total})…`;
+      
+      const results = await Promise.allSettled(
+        chunk.map(id => gmailDelete(`messages/${id}`, token))
+      );
+      
+      chunk.forEach((id, idx) => {
+        if (results[idx].status === 'fulfilled') {
+          succeeded.push(id);
+        } else if (!firstError) {
+          firstError = results[idx].reason;
+        }
+      });
+      
+      processed += chunk.length;
+    }
+    
+    btn.textContent = `Deleting (${processed}/${total})…`;
+
+    const failed = total - succeeded.length;
 
     if (succeeded.length) removeFromList(succeeded);
     if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) permanently deleted.`);
     else if (succeeded.length && failed) showToast(`${succeeded.length} deleted, ${failed} failed.`, true);
-    else if (results[0]?.reason instanceof AuthError) { handleSessionExpired(); return; }
-    else showToast('Error: ' + (results[0]?.reason?.message || 'Unknown error'), true);
+    else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
   } finally {
     btn.disabled = false; btn.textContent = 'Delete Forever';
   }
