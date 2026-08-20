@@ -304,6 +304,9 @@ header {
 .btn-ghost { background: transparent; color: var(--muted); }
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
 
+.btn-empty-trash { background: rgba(255, 100, 0, 0.12); color: #ff8c42; }
+.btn-empty-trash:hover:not(:disabled) { background: rgba(255, 100, 0, 0.25); filter: drop-shadow(0 4px 10px rgba(255, 107, 0, 0.3)); }
+
 .btn-link { 
   background: transparent; 
   border: none; 
