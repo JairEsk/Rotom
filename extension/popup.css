@@ -273,13 +273,13 @@ header {
   transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
   outline: none;
   
-  /* Squircle Mask */
+  /* Squircle Mask — straight sides + superellipse corners */
   border-radius: 0;
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z' fill='black'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
   -webkit-mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: center;
-  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z' fill='black'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
   mask-size: 100% 100%;
   mask-repeat: no-repeat;
   mask-position: center;
@@ -430,7 +430,7 @@ input[type="checkbox"] {
   transition: all 0.2s;
   
   border-radius: 0;
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z' fill='black'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
   -webkit-mask-size: 100% 100%;
 }
 input[type="checkbox"]:hover {
@@ -497,7 +497,7 @@ input[type="checkbox"]:checked::after {
   backdrop-filter: url(#liquid-glass-filter) blur(16px) saturate(150%);
   -webkit-backdrop-filter: url(#liquid-glass-filter) blur(16px) saturate(150%);
   
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M100,0 C20,0 0,20 0,100 C0,180 20,200 100,200 C180,200 200,180 200,100 C200,20 180,0 100,0 Z' fill='black'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
   -webkit-mask-size: 100% 100%;
   
   animation: slide-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;

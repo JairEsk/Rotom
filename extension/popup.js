@@ -1,4 +1,4 @@
-// ─── Gmail API helpers ────────────────────────────────────────────────────────
+// â”€â”€â”€ Gmail API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 async function gmailGet(path, token, params = {}) {
@@ -37,7 +37,7 @@ async function gmailDelete(path, token) {
 
 class AuthError extends Error { constructor() { super('auth'); } }
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let token         = null;
 let emails        = [];
 let selectedIds   = new Set();
@@ -48,7 +48,7 @@ let hasMorePages  = false;
 
 const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-filter'];
 
-// ─── Boot — wire all static listeners once ───────────────────────────────────
+// â”€â”€â”€ Boot â€” wire all static listeners once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sign-in-btn').addEventListener('click', signIn);
   document.getElementById('scan-btn').addEventListener('click', scanEmails);
@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
 });
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function init() {
   await restoreFilters();
   token = await getToken(false);
@@ -89,7 +89,7 @@ async function init() {
         token = null;
         showAuth();
       } else {
-        // Network/API error — show app but surface the problem clearly
+        // Network/API error â€” show app but surface the problem clearly
         showApp('', 0);
         showError('Could not load profile: ' + e.message);
         show('error-state');
@@ -100,7 +100,7 @@ async function init() {
   }
 }
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function showAuth() {
   show('auth-screen');
   hide('app-screen');
@@ -108,7 +108,7 @@ function showAuth() {
 
 async function signIn() {
   const btn = document.getElementById('sign-in-btn');
-  btn.disabled = true; btn.textContent = 'Connecting…';
+  btn.disabled = true; btn.textContent = 'Connectingâ€¦';
   try {
     token = await getToken(true);
     const profile = await gmailGet('profile', token);
@@ -141,7 +141,7 @@ function getToken(interactive) {
   });
 }
 
-// ─── App screen ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ App screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function showApp(email, totalMessages) {
   hide('auth-screen');
   show('app-screen');
@@ -153,7 +153,7 @@ function showApp(email, totalMessages) {
   }
 }
 
-// ─── Filter persistence ───────────────────────────────────────────────────────
+// â”€â”€â”€ Filter persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function saveFilters() {
   const data = {};
   FILTER_KEYS.forEach(id => { data[id] = document.getElementById(id).value; });
@@ -173,7 +173,7 @@ async function restoreFilters() {
   });
 }
 
-// ─── Filters ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildQuery() {
   const size     = document.getElementById('size-filter').value;
   const category = document.getElementById('category-filter').value;
@@ -187,7 +187,7 @@ function buildQuery() {
   return parts.join(' ');
 }
 
-// ─── Scan ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Scan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function scanEmails() {
   emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
   currentQuery = buildQuery();
@@ -284,7 +284,7 @@ async function fetchEmailItem(id) {
   return { id: msg.id, subject, from, date, estimatedSize: size, readableSize: formatBytes(size) };
 }
 
-// ─── Render ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function renderEmails(replace) {
   const body = document.getElementById('email-body');
   if (replace) {
@@ -361,7 +361,7 @@ function updateSelection() {
   }
 }
 
-// ─── Trash modal ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Trash modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openTrashModal() {
   if (selectedIds.size === 0) return;
   document.getElementById('trash-count').textContent = selectedIds.size;
@@ -384,7 +384,7 @@ async function confirmTrash() {
   try {
     for (let i = 0; i < total; i += 5) {
       const chunk = ids.slice(i, i + 5);
-      btn.textContent = `Trashing (${processed}/${total})…`;
+      btn.textContent = `Trashing (${processed}/${total})â€¦`;
       
       const results = await Promise.allSettled(
         chunk.map(id => gmailPost(`messages/${id}/trash`, token, {}))
@@ -401,12 +401,12 @@ async function confirmTrash() {
       processed += chunk.length;
     }
     
-    btn.textContent = `Trashing (${processed}/${total})…`;
+    btn.textContent = `Trashing (${processed}/${total})â€¦`;
 
     const failed = total - succeeded.length;
 
     if (succeeded.length) removeFromList(succeeded);
-    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash ✓`);
+    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash âœ“`);
     else if (succeeded.length && failed) showToast(`${succeeded.length} trashed, ${failed} failed.`, true);
     else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
     else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
@@ -415,7 +415,7 @@ async function confirmTrash() {
   }
 }
 
-// ─── Delete forever ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Delete forever â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function openDeleteModal() {
   if (selectedIds.size === 0) return;
   document.getElementById('delete-count').textContent = selectedIds.size;
@@ -429,7 +429,17 @@ async function confirmDeleteForever() {
   closeDeleteModal();
   const btn = document.getElementById('delete-btn');
   btn.disabled = true;
-  
+
+  // Force a fresh token -- the cached one may lack https://mail.google.com/ scope.
+  try {
+    chrome.identity.removeCachedAuthToken({ token });
+    token = await getToken(true);
+  } catch (e) {
+    showToast('Could not refresh auth. Please sign in again.', true);
+    btn.disabled = false; btn.textContent = 'Delete Forever';
+    return;
+  }
+
   const total = ids.length;
   let processed = 0;
   let succeeded = [];
@@ -438,7 +448,7 @@ async function confirmDeleteForever() {
   try {
     for (let i = 0; i < total; i += 5) {
       const chunk = ids.slice(i, i + 5);
-      btn.textContent = `Deleting (${processed}/${total})…`;
+      btn.textContent = `Deleting (${processed}/${total})â€¦`;
       
       const results = await Promise.allSettled(
         chunk.map(id => gmailDelete(`messages/${id}`, token))
@@ -455,7 +465,7 @@ async function confirmDeleteForever() {
       processed += chunk.length;
     }
     
-    btn.textContent = `Deleting (${processed}/${total})…`;
+    btn.textContent = `Deleting (${processed}/${total})â€¦`;
 
     const failed = total - succeeded.length;
 
@@ -469,7 +479,7 @@ async function confirmDeleteForever() {
   }
 }
 
-// ─── Session expiry ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Session expiry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
   const oldToken = token;
@@ -478,7 +488,7 @@ function handleSessionExpired() {
   setTimeout(showAuth, 2200);
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function removeFromList(ids) {
   const s = new Set(ids);
   emails = emails.filter(e => !s.has(e.id));
