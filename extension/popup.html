@@ -6,16 +6,32 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
+  <!-- Optical Engine for Liquid Glass -->
+  <svg style="display: none;">
+    <defs>
+      <filter id="liquid-glass-filter" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="1" result="noise" />
+        <feGaussianBlur in="noise" stdDeviation="3" result="smoothedNoise" />
+        <feDisplacementMap in="SourceGraphic" in2="smoothedNoise" scale="25" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <!-- Background Orbs to show off refraction -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
 
   <!-- AUTH SCREEN -->
   <div id="auth-screen">
-    <div class="brand">
-      <h1>R.O.T.O.M.</h1>
-      <p class="subtitle">Remover Of Trash &amp; Obsolete Mails</p>
+    <div class="auth-container liquid-glass-panel">
+      <div class="brand">
+        <h1>R.O.T.O.M.</h1>
+        <p class="subtitle">Remover Of Trash &amp; Obsolete Mails</p>
+      </div>
+      <p class="auth-desc">Connect your Gmail account to start scanning for large and old emails.</p>
+      <button id="sign-in-btn" class="btn btn-primary btn-full">Connect Gmail</button>
+      <p id="auth-error" class="error-msg" style="display:none;"></p>
     </div>
-    <p class="auth-desc">Connect your Gmail account to start scanning for large and old emails.</p>
-    <button id="sign-in-btn" class="btn btn-primary btn-full">Connect Gmail</button>
-    <p id="auth-error" class="error-msg" style="display:none;"></p>
   </div>
 
   <!-- MAIN APP -->
@@ -31,7 +47,7 @@
     </header>
 
     <!-- Storage banner -->
-    <div id="storage-banner" class="storage-banner" style="display:none;">
+    <div id="storage-banner" class="storage-banner liquid-glass-panel" style="display:none; margin-top: 1rem;">
       <span id="storage-messages"></span>
       <span id="storage-recoverable" style="display:none;">
         &nbsp;·&nbsp;<span id="recoverable-size" class="highlight">0 B</span> recoverable
@@ -39,7 +55,7 @@
     </div>
 
     <!-- Filters -->
-    <section class="filters">
+    <section class="filters liquid-glass-panel">
       <div class="filter-row">
         <div class="filter-group">
           <label>Size</label>
@@ -85,30 +101,30 @@
     </section>
 
     <!-- Actions bar -->
-    <div id="actions-bar" class="actions-bar" style="display:none;">
+    <div id="actions-bar" class="actions-bar liquid-glass-panel" style="display:none;">
       <button id="select-all-btn" class="btn btn-secondary btn-sm">Select All</button>
       <button id="trash-btn" class="btn btn-danger btn-sm" disabled>Trash</button>
-      <button id="delete-btn" class="btn btn-delete btn-sm" disabled>Delete Forever</button>
+      <button id="delete-btn" class="btn btn-delete btn-sm" disabled>Delete</button>
       <span id="selection-count" class="count-label">0 selected</span>
     </div>
 
     <!-- States -->
-    <div id="loading" class="state-box" style="display:none;">
+    <div id="loading" class="state-box liquid-glass-panel" style="display:none;">
       <div class="spinner"></div>
       <p>Scanning…</p>
     </div>
 
-    <div id="empty-state" class="state-box" style="display:none;">
+    <div id="empty-state" class="state-box liquid-glass-panel" style="display:none;">
       <p>No emails found. Try different filters.</p>
     </div>
 
-    <div id="error-state" class="state-box state-error" style="display:none;">
+    <div id="error-state" class="state-box state-error liquid-glass-panel" style="display:none;">
       <p id="error-message"></p>
       <button id="retry-btn" class="btn btn-secondary btn-sm">Retry</button>
     </div>
 
     <!-- Results table -->
-    <div id="results" style="display:none;">
+    <div id="results" class="liquid-glass-panel" style="display:none;">
       <div class="results-header">
         <span>Found <strong id="email-count">0</strong> emails &nbsp;·&nbsp; <span id="total-size" class="highlight">0 B</span></span>
       </div>
@@ -127,8 +143,8 @@
       <div id="load-more-area" class="load-more-area" style="display:none;">
         <button id="load-more-btn" class="btn btn-secondary btn-sm">Load more</button>
       </div>
-      <div id="load-more-loading" class="load-more-loading" style="display:none;">
-        <div class="spinner-sm"></div> Loading…
+      <div id="load-more-loading" class="load-more-loading" style="display:none; text-align: center; padding: 1rem;">
+        <div class="spinner-sm" style="display:inline-block; vertical-align: middle;"></div> Loading…
       </div>
     </div>
   </div>
@@ -164,5 +180,3 @@
   <script src="popup.js"></script>
 </body>
 </html>
-
-
