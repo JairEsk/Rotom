@@ -2,18 +2,18 @@
   "manifest_version": 3,
   "name": "R.O.T.O.M.",
   "short_name": "ROTOM",
-  "description": "Remover Of Trash & Obsolete Mails – scan and bulk-delete large or old Gmail messages.",
+  "description": "Remover Of Trash & Obsolete Mails - scan and bulk-delete large or old Gmail messages.",
   "version": "1.0.0",
   "icons": {
-    "16":  "icons/icon16.png",
-    "48":  "icons/icon48.png",
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16":  "icons/icon16.png",
-      "48":  "icons/icon48.png",
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     },
     "default_title": "R.O.T.O.M."
@@ -29,6 +29,7 @@
     "https://www.googleapis.com/*",
     "https://gmail.googleapis.com/*"
   ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAseP/t8HEgRHDhE0EotK1kdrdQsAbUN6czeiD128yVG/yBcism3UQgt+RUG5j9rU/7giH/B1Hfw3GZcQP4S+wIzCU7XEJc4Pm60nFHBW0zYqEsXuknoMUuiWijZAA7tQh8dgaW0qEFyCYPVL5EFzmfl1txtk2XrOt40+KLe908x/ptV7Gbdk9LhythYHmPig7v/M7eynRgMuJQsoEFSprXEKb/U7S/L2TcJVifMWnAJ0BwFUJC24aTPLThfkXTVRVcG9BcrkkihKHwjZqjfc0cQBz79VEJ0VgCzwdrqp+sf1fAFpMy0wt30EsHOInZk9E/BoVNEIuk1W9ETm+s+96zQIDAQAB",
   "oauth2": {
     "client_id": "844123707926-f3gmfcdgkqskdudkht2l2j5f6nmu9rfm.apps.googleusercontent.com",
     "scopes": [
