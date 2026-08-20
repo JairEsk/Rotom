@@ -258,7 +258,7 @@ header {
 }
 .filter-group select option { background: #1e293b; color: #fff; }
 
-/* ━━━ Buttons (Squircle Implementation) ━━━ */
+/* /* ── Buttons ─────────────────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -267,59 +267,97 @@ header {
   font-family: var(--font);
   font-weight: 600;
   font-size: 0.9rem;
-  border: none;
   padding: 0.75rem 1.25rem;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
   outline: none;
-  
-  /* Squircle Mask — straight sides + superellipse corners */
-  border-radius: 0;
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
-  -webkit-mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
-  mask-size: 100% 100%;
-  mask-repeat: no-repeat;
-  mask-position: center;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
-.btn:active { transform: scale(0.96); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
 
-/* drop-shadow instead of box-shadow because mask clips box-shadow */
-.btn-primary { background: var(--accent); color: #fff; filter: drop-shadow(0 4px 8px var(--accent-glow)); }
-.btn-primary:hover:not(:disabled) { background: var(--accent-h); filter: drop-shadow(0 6px 16px rgba(255, 107, 0, 0.6)); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: rgba(255, 150, 50, 0.35);
+  border-top-color: rgba(255, 210, 120, 0.5);
+  box-shadow: 0 4px 16px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-h);
+  box-shadow: 0 6px 24px rgba(255, 107, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
 
-.btn-secondary { background: rgba(255, 255, 255, 0.15); color: var(--text); }
-.btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.25); filter: drop-shadow(0 4px 8px rgba(255,255,255,0.1)); }
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.06);
+}
 
-.btn-danger { background: var(--danger); color: #fff; }
-.btn-danger:hover:not(:disabled) { background: var(--danger-h); filter: drop-shadow(0 4px 12px rgba(255, 69, 58, 0.4)); }
+.btn-danger {
+  background: rgba(255, 69, 58, 0.75);
+  color: #fff;
+  border-color: rgba(255, 100, 90, 0.35);
+  border-top-color: rgba(255, 160, 150, 0.5);
+  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(255, 105, 97, 0.85);
+  box-shadow: 0 6px 20px rgba(255, 69, 58, 0.5);
+}
 
-.btn-delete { background: rgba(255, 69, 58, 0.1); color: var(--danger-h); }
-.btn-delete:hover:not(:disabled) { background: rgba(255, 69, 58, 0.25); }
+.btn-delete {
+  background: rgba(255, 69, 58, 0.08);
+  color: var(--danger-h);
+  border-color: rgba(255, 69, 58, 0.2);
+}
+.btn-delete:hover:not(:disabled) {
+  background: rgba(255, 69, 58, 0.18);
+  box-shadow: 0 4px 12px rgba(255, 69, 58, 0.2);
+}
 
-.btn-ghost { background: transparent; color: var(--muted); }
-.btn-ghost:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); border-color: rgba(255,255,255,0.1); }
 
-.btn-empty-trash { background: rgba(255, 100, 0, 0.12); color: #ff8c42; }
-.btn-empty-trash:hover:not(:disabled) { background: rgba(255, 100, 0, 0.25); filter: drop-shadow(0 4px 10px rgba(255, 107, 0, 0.3)); }
+.btn-empty-trash {
+  background: rgba(255, 100, 0, 0.08);
+  color: #ff8c42;
+  border-color: rgba(255, 120, 0, 0.2);
+}
+.btn-empty-trash:hover:not(:disabled) {
+  background: rgba(255, 100, 0, 0.18);
+  box-shadow: 0 4px 14px rgba(255, 107, 0, 0.25);
+}
 
-.btn-link { 
-  background: transparent; 
-  border: none; 
-  color: var(--blue); 
-  font-size: 0.85rem; 
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--blue);
+  font-size: 0.85rem;
   cursor: pointer;
-  -webkit-mask-image: none; /* Reset mask for link */
-  mask-image: none; 
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-radius: 0;
+  padding: 0;
 }
 .btn-link:hover { color: var(--blue-h); text-decoration: underline; }
 
-.btn-full { width: 100%; padding: 1rem; font-size: 1.05rem; }
-.btn-sm { padding: 0.5rem 1rem; font-size: 0.8rem; }
+.btn-full { width: 100%; padding: 1rem; font-size: 1.05rem; border-radius: var(--radius-md); }
+.btn-sm { padding: 0.5rem 0.9rem; font-size: 0.8rem; border-radius: var(--radius-sm); }
 
 /* ━━━ Actions bar ━━━ */
 .actions-bar {
@@ -430,8 +468,7 @@ input[type="checkbox"] {
   transition: all 0.2s;
   
   border-radius: 0;
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
-  -webkit-mask-size: 100% 100%;
+  border-radius: 50px;
 }
 input[type="checkbox"]:hover {
   background: rgba(255,255,255,0.1);
@@ -497,8 +534,7 @@ input[type="checkbox"]:checked::after {
   backdrop-filter: url(#liquid-glass-filter) blur(16px) saturate(150%);
   -webkit-backdrop-filter: url(#liquid-glass-filter) blur(16px) saturate(150%);
   
-  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' preserveAspectRatio='none'><path d='M40,0 L160,0 C188,0 200,12 200,40 L200,160 C200,188 188,200 160,200 L40,200 C12,200 0,188 0,160 L0,40 C0,12 12,0 40,0 Z' fill='black'/></svg>");
-  -webkit-mask-size: 100% 100%;
+  border-radius: 50px;
   
   animation: slide-up 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
@@ -509,3 +545,4 @@ input[type="checkbox"]:checked::after {
   to   { opacity: 1; transform: translate(-50%, 0) scale(1); }
 }
 .error-msg { font-size: 0.85rem; color: var(--danger-h); text-align: center; margin-top: 0.5rem; }
+
