@@ -4,7 +4,7 @@ const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 async function gmailGet(path, token, params = {}) {
   const url = new URL(`${GMAIL}/${path}`);
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== '') url.searchParams.set(k, v);
+    if (Array.isArray(v)) { v.forEach(val => url.searchParams.append(k, val)); } else if (v !== undefined && v !== '') { url.searchParams.set(k, v); }
   });
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 401) throw new AuthError();
@@ -268,13 +268,14 @@ async function fetchMetadataBatch(msgs) {
 async function fetchEmailItem(id) {
   const msg = await gmailGet(`messages/${id}`, token, {
     format: 'metadata',
-    metadataHeaders: 'Subject,From,Date'
+    metadataHeaders: ['Subject', 'From', 'Date']
   });
   let subject = '', from = '', date = '';
   (msg.payload?.headers || []).forEach(h => {
-    if (h.name === 'Subject') subject = h.value;
-    if (h.name === 'From')    from    = h.value;
-    if (h.name === 'Date')    date    = h.value;
+    const name = h.name.toLowerCase();
+    if (name === 'subject') subject = h.value;
+    if (name === 'from') from = h.value;
+    if (name === 'date') date = h.value;
   });
   const size = msg.sizeEstimate || 0;
   return { id: msg.id, subject, from, date, estimatedSize: size, readableSize: formatBytes(size) };
