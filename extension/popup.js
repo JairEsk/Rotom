@@ -564,7 +564,6 @@ async function confirmEmptyTrash() {
   btn.disabled = true;
   btn.textContent = 'Emptying...';
   try {
-    // List all messages in Trash (loop through pages)
     let pageToken = undefined;
     let allIds = [];
     do {
@@ -580,22 +579,21 @@ async function confirmEmptyTrash() {
       return;
     }
 
-    // Delete all in chunks of 5
     let deleted = 0;
     let firstError = null;
     for (let i = 0; i < allIds.length; i += 5) {
       const chunk = allIds.slice(i, i + 5);
-      btn.textContent = Emptying (/)...;
-      const results = await Promise.allSettled(chunk.map(id => gmailDelete(messages/, token)));
-      results.forEach((r, idx) => {
+      btn.textContent = 'Emptying (' + deleted + '/' + allIds.length + ')...';
+      const results = await Promise.allSettled(chunk.map(id => gmailDelete('messages/' + id, token)));
+      results.forEach((r) => {
         if (r.status === 'fulfilled') { deleted++; }
         else if (!firstError) { firstError = r.reason; }
       });
     }
 
     const failed = allIds.length - deleted;
-    if (deleted && !failed) showToast(Trash emptied —  email(s) permanently deleted.);
-    else if (deleted && failed) showToast(${deleted} deleted,  failed., true);
+    if (deleted && !failed) showToast('Trash emptied \u2014 ' + deleted + ' email(s) permanently deleted.');
+    else if (deleted && failed) showToast(deleted + ' deleted, ' + failed + ' failed.', true);
     else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
     else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
   } catch (e) {
