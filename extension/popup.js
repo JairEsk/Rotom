@@ -63,6 +63,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('confirm-trash-btn').addEventListener('click', confirmTrash);
   document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
   document.getElementById('confirm-delete-btn').addEventListener('click', confirmDeleteForever);
+  document.getElementById('empty-trash-btn').addEventListener('click', openEmptyTrashModal);
+  document.getElementById('cancel-empty-trash-btn').addEventListener('click', closeEmptyTrashModal);
+  document.getElementById('confirm-empty-trash-btn').addEventListener('click', confirmEmptyTrash);
 
   // Persist filters on change
   FILTER_KEYS.forEach(id => {
@@ -538,6 +541,59 @@ function formatDate(raw) {
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
   } catch {
     return '';
+  }
+}
+
+// --- Empty Trash -----------------------------------------------------------
+function openEmptyTrashModal() { show('empty-trash-modal'); }
+function closeEmptyTrashModal() { hide('empty-trash-modal'); }
+
+async function confirmEmptyTrash() {
+  closeEmptyTrashModal();
+  const btn = document.getElementById('empty-trash-btn');
+  btn.disabled = true;
+  btn.textContent = 'Emptying...';
+  try {
+    // List all messages in Trash (loop through pages)
+    let pageToken = undefined;
+    let allIds = [];
+    do {
+      const params = { labelIds: 'TRASH', maxResults: 500 };
+      if (pageToken) params.pageToken = pageToken;
+      const res = await gmailGet('messages', token, params);
+      if (res.messages) allIds.push(...res.messages.map(m => m.id));
+      pageToken = res.nextPageToken;
+    } while (pageToken);
+
+    if (allIds.length === 0) {
+      showToast('Trash is already empty.');
+      return;
+    }
+
+    // Delete all in chunks of 5
+    let deleted = 0;
+    let firstError = null;
+    for (let i = 0; i < allIds.length; i += 5) {
+      const chunk = allIds.slice(i, i + 5);
+      btn.textContent = Emptying (/)...;
+      const results = await Promise.allSettled(chunk.map(id => gmailDelete(messages/, token)));
+      results.forEach((r, idx) => {
+        if (r.status === 'fulfilled') { deleted++; }
+        else if (!firstError) { firstError = r.reason; }
+      });
+    }
+
+    const failed = allIds.length - deleted;
+    if (deleted && !failed) showToast(Trash emptied —  email(s) permanently deleted.);
+    else if (deleted && failed) showToast(${deleted} deleted,  failed., true);
+    else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
+  } catch (e) {
+    if (e instanceof AuthError) { handleSessionExpired(); return; }
+    showToast('Error: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Empty Trash';
   }
 }
 
