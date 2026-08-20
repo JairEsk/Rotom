@@ -1,4 +1,4 @@
-// â”€â”€â”€ Gmail API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿// â”€â”€â”€ Gmail API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 async function gmailGet(path, token, params = {}) {
@@ -108,7 +108,7 @@ function showAuth() {
 
 async function signIn() {
   const btn = document.getElementById('sign-in-btn');
-  btn.disabled = true; btn.textContent = 'Connectingâ€¦';
+  btn.disabled = true; btn.textContent = 'Connecting...';
   try {
     token = await getToken(true);
     const profile = await gmailGet('profile', token);
@@ -384,7 +384,7 @@ async function confirmTrash() {
   try {
     for (let i = 0; i < total; i += 5) {
       const chunk = ids.slice(i, i + 5);
-      btn.textContent = `Trashing (${processed}/${total})â€¦`;
+      btn.textContent = `Trashing (${processed}/${total})...`;
       
       const results = await Promise.allSettled(
         chunk.map(id => gmailPost(`messages/${id}/trash`, token, {}))
@@ -401,12 +401,12 @@ async function confirmTrash() {
       processed += chunk.length;
     }
     
-    btn.textContent = `Trashing (${processed}/${total})â€¦`;
+    btn.textContent = `Trashing (${processed}/${total})...`;
 
     const failed = total - succeeded.length;
 
     if (succeeded.length) removeFromList(succeeded);
-    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash âœ“`);
+    if (succeeded.length && !failed) showToast(`${succeeded.length} email(s) moved to Trash ✓`);
     else if (succeeded.length && failed) showToast(`${succeeded.length} trashed, ${failed} failed.`, true);
     else if (firstError instanceof AuthError) { handleSessionExpired(); return; }
     else showToast('Error: ' + (firstError?.message || 'Unknown error'), true);
@@ -448,7 +448,7 @@ async function confirmDeleteForever() {
   try {
     for (let i = 0; i < total; i += 5) {
       const chunk = ids.slice(i, i + 5);
-      btn.textContent = `Deleting (${processed}/${total})â€¦`;
+      btn.textContent = `Deleting (${processed}/${total})...`;
       
       const results = await Promise.allSettled(
         chunk.map(id => gmailDelete(`messages/${id}`, token))
@@ -465,7 +465,7 @@ async function confirmDeleteForever() {
       processed += chunk.length;
     }
     
-    btn.textContent = `Deleting (${processed}/${total})â€¦`;
+    btn.textContent = `Deleting (${processed}/${total})...`;
 
     const failed = total - succeeded.length;
 
