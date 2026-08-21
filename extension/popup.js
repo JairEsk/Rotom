@@ -330,7 +330,7 @@ function appendEmailRow(body, email) {
     <td class="actions-cell">
       ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
     </td>
-  ;
+  `;
   tr.querySelector('.email-check').addEventListener('change', e => {
     e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
     syncHeaderCheckbox();
@@ -370,7 +370,7 @@ function updateSelection() {
   const unsubCapable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo).length;
   const bulkUnsubBtn = document.getElementById('unsub-bulk-btn');
   bulkUnsubBtn.disabled = unsubCapable === 0;
-  bulkUnsubBtn.textContent = unsubCapable > 0 ? 🚫 Unsubscribe () : '🚫 Unsubscribe';
+  bulkUnsubBtn.textContent = unsubCapable > 0 ? 🚫 Unsubscribe (${unsubCapable}) : '🚫 Unsubscribe';
   document.getElementById('delete-btn').disabled = n === 0;
 
   const rec = document.getElementById('storage-recoverable');
@@ -641,7 +641,7 @@ function parseUnsubscribeHeader(headers) {
   if (!rawValue) return null;
 
   const urls = rawValue.match(/<([^>]+)>/g)?.map(m => m.slice(1, -1)) || [];
-  const httpsUrl = urls.find(u => u.startsWith('https://') || u.startsWith('http://'));
+  const httpsUrl = urls.find(u => u.startsWith('https://'));
   const mailtoUrl = urls.find(u => u.startsWith('mailto:'));
 
   if (httpsUrl && hasOneClick) return { type: 'one-click', url: httpsUrl };
@@ -656,11 +656,17 @@ async function executeUnsubscribe(email) {
   if (!info) return;
 
   if (info.type === 'one-click' || info.type === 'https') {
-    await fetch(info.url, {
+    if (!info.url.startsWith('https://')) {
+      throw new Error('Unsubscribe URL is not HTTPS — skipped for security.');
+    }
+    const response = await fetch(info.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'List-Unsubscribe=One-Click'
     });
+    if (!response.ok) {
+      throw new Error(Unsubscribe POST failed: HTTP );
+    }
     return;
   }
 
