@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€ Gmail API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Gmail API helpers ---
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 async function gmailGet(path, token, params = {}) {
@@ -37,7 +37,7 @@ async function gmailDelete(path, token) {
 
 class AuthError extends Error { constructor() { super('auth'); } }
 
-// â”€â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- State ---
 let token         = null;
 let emails        = [];
 let selectedIds   = new Set();
@@ -48,7 +48,7 @@ let hasMorePages  = false;
 
 const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-filter'];
 
-// â”€â”€â”€ Boot â€” wire all static listeners once â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Boot: wire all static listeners once ---
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sign-in-btn').addEventListener('click', signIn);
   document.getElementById('scan-btn').addEventListener('click', scanEmails);
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
   init();
 });
 
-// â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Init ---
 async function init() {
   await restoreFilters();
   initUnsubscribeCallout();
@@ -110,7 +110,7 @@ async function init() {
   }
 }
 
-// â”€â”€â”€ Auth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Auth ---
 function showAuth() {
   show('auth-screen');
   hide('app-screen');
@@ -151,7 +151,7 @@ function getToken(interactive) {
   });
 }
 
-// â”€â”€â”€ App screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- App screen ---
 function showApp(email, totalMessages) {
   hide('auth-screen');
   show('app-screen');
@@ -163,7 +163,7 @@ function showApp(email, totalMessages) {
   }
 }
 
-// â”€â”€â”€ Filter persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Filter persistence ---
 function saveFilters() {
   const data = {};
   FILTER_KEYS.forEach(id => { data[id] = document.getElementById(id).value; });
@@ -183,7 +183,7 @@ async function restoreFilters() {
   });
 }
 
-// â”€â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Filters ---
 function buildQuery() {
   const size     = document.getElementById('size-filter').value;
   const category = document.getElementById('category-filter').value;
@@ -197,7 +197,7 @@ function buildQuery() {
   return parts.join(' ');
 }
 
-// â”€â”€â”€ Scan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Scan ---
 async function scanEmails() {
   emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
   currentQuery = buildQuery();
@@ -295,7 +295,7 @@ async function fetchEmailItem(id) {
   return { id: msg.id, subject, from: sender, date, estimatedSize: size, readableSize: formatBytes(size), unsubscribeInfo };
 }
 
-// â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Render ---
 function renderEmails(replace) {
   const body = document.getElementById('email-body');
   if (replace) {
@@ -384,7 +384,7 @@ function updateSelection() {
   }
 }
 
-// â”€â”€â”€ Trash modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Trash modal ---
 function openTrashModal() {
   if (selectedIds.size === 0) return;
   document.getElementById('trash-count').textContent = selectedIds.size;
@@ -438,7 +438,7 @@ async function confirmTrash() {
   }
 }
 
-// â”€â”€â”€ Delete forever â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Delete forever ---
 function openDeleteModal() {
   if (selectedIds.size === 0) return;
   document.getElementById('delete-count').textContent = selectedIds.size;
@@ -502,7 +502,7 @@ async function confirmDeleteForever() {
   }
 }
 
-// â”€â”€â”€ Session expiry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Session expiry ---
 function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
   const oldToken = token;
@@ -511,7 +511,7 @@ function handleSessionExpired() {
   setTimeout(showAuth, 2200);
 }
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Helpers ---
 function removeFromList(ids) {
   const idsSet = new Set(ids);
   emails = emails.filter(email => !idsSet.has(email.id));
@@ -577,7 +577,7 @@ function formatDate(raw) {
   }
 }
 
-// --- Empty Trash -----------------------------------------------------------
+// --- Empty Trash ---
 function openEmptyTrashModal() { show('empty-trash-modal'); }
 function closeEmptyTrashModal() { hide('empty-trash-modal'); }
 
