@@ -66,6 +66,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('empty-trash-btn').addEventListener('click', openEmptyTrashModal);
   document.getElementById('cancel-empty-trash-btn').addEventListener('click', closeEmptyTrashModal);
   document.getElementById('confirm-empty-trash-btn').addEventListener('click', confirmEmptyTrash);
+  document.getElementById('cancel-unsub-btn').addEventListener('click', closeUnsubscribeModal);
+  document.getElementById('confirm-unsub-btn').addEventListener('click', confirmUnsubscribe);
+  document.getElementById('unsub-bulk-btn').addEventListener('click', openBulkUnsubscribeModal);
+  document.getElementById('cancel-bulk-unsub-btn').addEventListener('click', closeBulkUnsubscribeModal);
+  document.getElementById('confirm-bulk-unsub-btn').addEventListener('click', confirmBulkUnsubscribe);
+  document.getElementById('unsub-callout-dismiss').addEventListener('click', () => {
+    hide('unsub-callout');
+    chrome.storage.local.set({ unsubCalloutDismissed: true });
+  });
 
   // Persist filters on change
   FILTER_KEYS.forEach(id => {
@@ -79,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // â”€â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function init() {
   await restoreFilters();
+  initUnsubscribeCallout();
   token = await getToken(false);
   if (token) {
     try {
@@ -271,17 +281,18 @@ async function fetchMetadataBatch(msgs) {
 async function fetchEmailItem(id) {
   const msg = await gmailGet(`messages/${id}`, token, {
     format: 'metadata',
-    metadataHeaders: ['Subject', 'From', 'Date']
+    metadataHeaders: ['Subject', 'From', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
   });
-  let subject = '', from = '', date = '';
-  (msg.payload?.headers || []).forEach(h => {
-    const name = h.name.toLowerCase();
-    if (name === 'subject') subject = h.value;
-    if (name === 'from') from = h.value;
-    if (name === 'date') date = h.value;
+  let subject = '', sender = '', date = '';
+  (msg.payload?.headers || []).forEach(header => {
+    const name = header.name.toLowerCase();
+    if (name === 'subject') subject = header.value;
+    if (name === 'from') sender = header.value;
+    if (name === 'date') date = header.value;
   });
   const size = msg.sizeEstimate || 0;
-  return { id: msg.id, subject, from, date, estimatedSize: size, readableSize: formatBytes(size) };
+  const unsubscribeInfo = parseUnsubscribeHeader(msg.payload?.headers || []);
+  return { id: msg.id, subject, from: sender, date, estimatedSize: size, readableSize: formatBytes(size), unsubscribeInfo };
 }
 
 // â”€â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -307,6 +318,7 @@ function appendEmailRow(body, email) {
   // Gmail web link for this message
   const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
 
+  if (email.unsubscribeInfo) tr.classList.add('has-unsub');
   tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
     <td class="from-cell" title="${escHtml(email.from)}">${escHtml(email.from)}</td>
@@ -315,13 +327,20 @@ function appendEmailRow(body, email) {
     </td>
     <td class="date-cell" title="${escHtml(email.date)}">${escHtml(dateStr)}</td>
     <td class="size-cell">${escHtml(email.readableSize)}</td>
-  `;
+    <td class="actions-cell">
+      ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
+    </td>
+  ;
   tr.querySelector('.email-check').addEventListener('change', e => {
     e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
     syncHeaderCheckbox();
     updateSelection();
   });
   body.appendChild(tr);
+  if (email.unsubscribeInfo) {
+    const unsubBtnEl = tr.querySelector('.unsub-btn');
+    if (unsubBtnEl) unsubBtnEl.addEventListener('click', () => openUnsubscribeModal(email));
+  }
 }
 
 function syncHeaderCheckbox() {
@@ -348,6 +367,10 @@ function updateSelection() {
   const n = selectedIds.size;
   document.getElementById('selection-count').textContent = `${n} selected`;
   document.getElementById('trash-btn').disabled  = n === 0;
+  const unsubCapable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo).length;
+  const bulkUnsubBtn = document.getElementById('unsub-bulk-btn');
+  bulkUnsubBtn.disabled = unsubCapable === 0;
+  bulkUnsubBtn.textContent = unsubCapable > 0 ? 🚫 Unsubscribe () : '🚫 Unsubscribe';
   document.getElementById('delete-btn').disabled = n === 0;
 
   const rec = document.getElementById('storage-recoverable');
@@ -490,8 +513,8 @@ function handleSessionExpired() {
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function removeFromList(ids) {
-  const s = new Set(ids);
-  emails = emails.filter(e => !s.has(e.id));
+  const idsSet = new Set(ids);
+  emails = emails.filter(email => !idsSet.has(email.id));
   ids.forEach(id => {
     selectedIds.delete(id);
     document.querySelector(`tr[data-id="${id}"]`)?.remove();
@@ -516,11 +539,11 @@ function showError(msg) {
 }
 
 function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 4000);
+  const toastEl = document.getElementById('toast');
+  toastEl.textContent = msg;
+  toastEl.className = `toast ${isError ? 'toast-error' : 'toast-success'}`;
+  toastEl.style.display = 'block';
+  setTimeout(() => { toastEl.style.display = 'none'; }, 4000);
 }
 
 function show(id) { document.getElementById(id).style.display = ''; }
@@ -533,22 +556,22 @@ function showEl(id, text) {
 
 function formatBytes(b) {
   if (!b) return '0 B';
-  const k = 1024, s = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(b) / Math.log(k));
-  return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
+  const kb = 1024, units = ['B', 'KB', 'MB', 'GB'];
+  const unitIndex = Math.floor(Math.log(b) / Math.log(kb));
+  return parseFloat((b / Math.pow(kb, unitIndex)).toFixed(1)) + ' ' + units[unitIndex];
 }
 
 function formatDate(raw) {
   if (!raw) return '';
   try {
-    const d = new Date(raw);
+    const date = new Date(raw);
     const now = new Date();
-    const diff = now - d;
+    const diff = now - date;
     const days = Math.floor(diff / 86400000);
     if (days === 0) return 'Today';
     if (days === 1) return 'Yesterday';
-    if (days < 365) return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+    if (days < 365) return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
   } catch {
     return '';
   }
@@ -605,6 +628,157 @@ async function confirmEmptyTrash() {
   }
 }
 
+
+// --- Unsubscribe: parse List-Unsubscribe header ----------------------------
+function parseUnsubscribeHeader(headers) {
+  let rawValue = '';
+  let hasOneClick = false;
+  headers.forEach(header => {
+    const name = header.name.toLowerCase();
+    if (name === 'list-unsubscribe') rawValue = header.value;
+    if (name === 'list-unsubscribe-post' && header.value.includes('One-Click')) hasOneClick = true;
+  });
+  if (!rawValue) return null;
+
+  const urls = rawValue.match(/<([^>]+)>/g)?.map(m => m.slice(1, -1)) || [];
+  const httpsUrl = urls.find(u => u.startsWith('https://') || u.startsWith('http://'));
+  const mailtoUrl = urls.find(u => u.startsWith('mailto:'));
+
+  if (httpsUrl && hasOneClick) return { type: 'one-click', url: httpsUrl };
+  if (httpsUrl) return { type: 'https', url: httpsUrl };
+  if (mailtoUrl) return { type: 'mailto', url: mailtoUrl };
+  return null;
+}
+
+// --- Unsubscribe: execute for a single email -------------------------------
+async function executeUnsubscribe(email) {
+  const info = email.unsubscribeInfo;
+  if (!info) return;
+
+  if (info.type === 'one-click' || info.type === 'https') {
+    await fetch(info.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'List-Unsubscribe=One-Click'
+    });
+    return;
+  }
+
+  if (info.type === 'mailto') {
+    const parsed = new URL(info.url);
+    const to = parsed.pathname;
+    const subject = parsed.searchParams.get('subject') || 'unsubscribe';
+    const rawMsg = [`To: ${to}`, `Subject: ${subject}`, ``, ``].join('\r\n');
+    const encoded = btoa(unescape(encodeURIComponent(rawMsg)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    await gmailPost('messages/send', token, { raw: encoded });
+  }
+}
+
+// --- Unsubscribe: open modal for a single email ----------------------------
+function openUnsubscribeModal(email) {
+  const senderName = (email.from || '').replace(/<[^>]+>/, '').trim() || email.from;
+  document.getElementById('unsub-sender-name').textContent = senderName;
+  document.getElementById('unsub-also-trash').checked = false;
+
+  const modal = document.getElementById('unsub-modal');
+  modal.dataset.emailId = email.id;
+  show('unsub-modal');
+}
+
+function closeUnsubscribeModal() { hide('unsub-modal'); }
+
+async function confirmUnsubscribe() {
+  const modal = document.getElementById('unsub-modal');
+  const emailId = modal.dataset.emailId;
+  const email = emails.find(e => e.id === emailId);
+  if (!email) { closeUnsubscribeModal(); return; }
+
+  const alsoTrash = document.getElementById('unsub-also-trash').checked;
+  closeUnsubscribeModal();
+
+  setRowUnsubState(emailId, 'pending');
+  try {
+    await executeUnsubscribe(email);
+    setRowUnsubState(emailId, 'done');
+    email.unsubscribeInfo = { ...email.unsubscribeInfo, status: 'done' };
+    const senderName = (email.from || '').replace(/<[^>]+>/, '').trim() || email.from;
+    showToast(`Unsubscribe request sent to ${senderName}`);
+
+    if (alsoTrash) {
+      await gmailPost(`messages/${emailId}/trash`, token, {});
+      removeFromList([emailId]);
+    }
+  } catch (err) {
+    setRowUnsubState(emailId, 'failed');
+    email.unsubscribeInfo = { ...email.unsubscribeInfo, status: 'failed' };
+    if (err instanceof AuthError) { handleSessionExpired(); return; }
+    showToast('Unsubscribe failed: ' + err.message, true);
+  }
+}
+
+// --- Unsubscribe: bulk unsubscribe for selected emails ---------------------
+function openBulkUnsubscribeModal() {
+  const capable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo);
+  if (capable.length === 0) { showToast('None of the selected emails support unsubscribe.', true); return; }
+  document.getElementById('bulk-unsub-count').textContent = capable.length;
+  document.getElementById('bulk-unsub-also-trash').checked = false;
+  show('bulk-unsub-modal');
+}
+
+function closeBulkUnsubscribeModal() { hide('bulk-unsub-modal'); }
+
+async function confirmBulkUnsubscribe() {
+  const capable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo);
+  const alsoTrash = document.getElementById('bulk-unsub-also-trash').checked;
+  closeBulkUnsubscribeModal();
+
+  let succeeded = [];
+  let failed = 0;
+  for (const email of capable) {
+    setRowUnsubState(email.id, 'pending');
+    try {
+      await executeUnsubscribe(email);
+      setRowUnsubState(email.id, 'done');
+      email.unsubscribeInfo = { ...email.unsubscribeInfo, status: 'done' };
+      succeeded.push(email.id);
+    } catch {
+      setRowUnsubState(email.id, 'failed');
+      email.unsubscribeInfo = { ...email.unsubscribeInfo, status: 'failed' };
+      failed++;
+    }
+  }
+
+  if (succeeded.length) showToast(`Unsubscribed from ${succeeded.length} sender(s)${failed ? `, ${failed} failed` : ''}.`, failed > 0);
+  else showToast('All unsubscribe requests failed.', true);
+
+  if (alsoTrash && succeeded.length) {
+    for (let i = 0; i < succeeded.length; i += 5) {
+      await Promise.allSettled(succeeded.slice(i, i + 5).map(id => gmailPost(`messages/${id}/trash`, token, {})));
+    }
+    removeFromList(succeeded);
+  }
+}
+
+// --- Unsubscribe: update row visual state ----------------------------------
+function setRowUnsubState(emailId, state) {
+  const tr = document.querySelector(`tr[data-id="${emailId}"]`);
+  if (!tr) return;
+  tr.dataset.unsubState = state;
+  const btn = tr.querySelector('.unsub-btn');
+  if (!btn) return;
+  if (state === 'pending') { btn.textContent = '⏳'; btn.disabled = true; btn.title = 'Sending unsubscribe request...'; }
+  else if (state === 'done') { btn.textContent = '✓'; btn.disabled = true; btn.title = 'Unsubscribe request sent'; }
+  else if (state === 'failed') { btn.textContent = '⚠'; btn.disabled = false; btn.title = 'Unsubscribe failed — click to retry'; }
+}
+
+// --- First-use callout -----------------------------------------------------
+function initUnsubscribeCallout() {
+  chrome.storage.local.get('unsubCalloutDismissed', ({ unsubCalloutDismissed }) => {
+    if (unsubCalloutDismissed) return;
+    show('unsub-callout');
+  });
+}
 function escHtml(t) {
   if (!t) return '';
   const d = document.createElement('div');

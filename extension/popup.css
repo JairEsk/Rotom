@@ -69,7 +69,7 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
 
-/* ━━━ Mixin de Liquid Glass ━━━ */
+/* ━━━ Liquid Glass Mixin ━━━ */
 .liquid-glass-panel {
   background: var(--glass-bg);
   /* Liquid Glass Refraction Effect */
@@ -546,3 +546,97 @@ input[type="checkbox"]:checked::after {
 }
 .error-msg { font-size: 0.85rem; color: var(--danger-h); text-align: center; margin-top: 0.5rem; }
 
+
+/* ─── Unsubscribe feature ─────────────────────────────────────────── */
+
+/* Teal left-border accent for rows that support unsubscribe */
+tbody tr.has-unsub {
+  border-left: 3px solid rgba(0, 210, 190, 0.7);
+}
+tbody tr[data-unsub-state="done"] {
+  border-left: 3px solid rgba(48, 209, 88, 0.5);
+  opacity: 0.7;
+}
+tbody tr[data-unsub-state="failed"] {
+  border-left: 3px solid rgba(255, 69, 58, 0.7);
+}
+tbody tr[data-unsub-state="pending"] {
+  border-left: 3px solid rgba(255, 159, 10, 0.7);
+}
+
+/* Actions column */
+.col-actions { width: 42px; text-align: center; }
+td.actions-cell { text-align: center; padding: 0.4rem 0.5rem; }
+
+/* Unsub button per row */
+.unsub-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  line-height: 1;
+}
+tbody tr:hover .unsub-btn { opacity: 1; }
+tbody tr[data-unsub-state="done"]   .unsub-btn,
+tbody tr[data-unsub-state="pending"] .unsub-btn,
+tbody tr[data-unsub-state="failed"]  .unsub-btn { opacity: 1; }
+.unsub-btn:hover { background: rgba(0, 210, 190, 0.15); }
+.unsub-btn:disabled { cursor: default; }
+
+/* Bulk unsubscribe button */
+.btn-unsub {
+  background: rgba(0, 210, 190, 0.1);
+  color: #00d2be;
+  border-color: rgba(0, 210, 190, 0.25);
+}
+.btn-unsub:hover:not(:disabled) {
+  background: rgba(0, 210, 190, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 210, 190, 0.2);
+}
+
+/* First-use callout */
+.unsub-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 1rem 0.75rem 1rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 210, 190, 0.08);
+  border: 1px solid rgba(0, 210, 190, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.5;
+}
+.unsub-callout-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+.unsub-callout-dismiss:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+/* Modal checkbox label */
+.modal-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  margin-top: 0.75rem;
+}
+.modal-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
