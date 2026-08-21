@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -30,6 +30,7 @@
       </div>
       <p class="auth-desc">Connect your Gmail account to start scanning for large and old emails.</p>
       <button id="sign-in-btn" class="btn btn-primary btn-full">Connect Gmail</button>
+      <button id="switch-account-btn" class="btn" style="margin-top: 12px; width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; color: rgba(255,255,255,0.7); cursor: pointer; font-weight: 500; transition: all 0.2s ease;">Switch Account</button>
       <p id="auth-error" class="error-msg" style="display:none;"></p>
     </div>
   </div>
@@ -106,14 +107,14 @@
       <button id="trash-btn" class="btn btn-danger btn-sm" disabled>Trash</button>
       <button id="delete-btn" class="btn btn-delete btn-sm" disabled>Delete</button>
       <span id="selection-count" class="count-label">0 selected</span>
-      <button id="unsub-bulk-btn" class="btn btn-unsub btn-sm" disabled>🚫 Unsubscribe</button>
+      <button id="unsub-bulk-btn" class="btn btn-unsub btn-sm" disabled>?? Unsubscribe</button>
       <button id="empty-trash-btn" class="btn btn-empty-trash btn-sm">Empty Trash</button>
     </div>
 
     <!-- States -->
     <div id="loading" class="state-box liquid-glass-panel" style="display:none;">
       <div class="spinner"></div>
-      <p>Scanning…</p>
+      <p>Scanning�</p>
     </div>
 
     <div id="empty-state" class="state-box liquid-glass-panel" style="display:none;">
@@ -153,7 +154,7 @@
         <button id="load-more-btn" class="btn btn-secondary btn-sm">Load more</button>
       </div>
       <div id="load-more-loading" class="load-more-loading" style="display:none; text-align: center; padding: 1rem;">
-        <div class="spinner-sm" style="display:inline-block; vertical-align: middle;"></div> Loading…
+        <div class="spinner-sm" style="display:inline-block; vertical-align: middle;"></div> Loading�
       </div>
     </div>
   </div>
@@ -174,7 +175,7 @@
   <!-- Delete forever modal -->
   <div id="delete-modal" class="modal-overlay" style="display:none;">
     <div class="modal">
-      <h3>⚠ Delete Forever?</h3>
+      <h3>? Delete Forever?</h3>
       <p>You are about to <strong>permanently delete</strong> <span id="delete-count">0</span> email(s).</p>
       <p class="modal-warning">This <strong>cannot be undone</strong>. Emails won't go to Trash.</p>
       <div class="modal-actions">

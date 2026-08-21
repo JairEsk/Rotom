@@ -51,6 +51,7 @@ const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-fi
 // --- Boot: wire all static listeners once ---
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sign-in-btn').addEventListener('click', signIn);
+  document.getElementById('switch-account-btn').addEventListener('click', switchAccount);
   document.getElementById('scan-btn').addEventListener('click', scanEmails);
   document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
   document.getElementById('trash-btn').addEventListener('click', openTrashModal);
@@ -129,6 +130,26 @@ async function signIn() {
   }
 }
 
+async function switchAccount() {
+  const btn = document.getElementById('switch-account-btn');
+  btn.disabled = true; btn.textContent = 'Switching...';
+  if (token) {
+    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' }); } catch {}
+    token = null;
+  }
+  if (chrome.identity.clearAllCachedAuthTokens) {
+    try {
+      await new Promise(resolve => {
+        const p = chrome.identity.clearAllCachedAuthTokens();
+        if (p && p.then) p.then(resolve).catch(resolve);
+        else resolve();
+      });
+    } catch {}
+  }
+  btn.disabled = false; btn.textContent = 'Switch Account';
+  signIn();
+}
+
 async function signOut() {
   if (token) {
     const oldToken = token;
@@ -136,6 +157,16 @@ async function signOut() {
     try {
       await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' });
     } catch {}
+  }
+  if (chrome.identity.clearAllCachedAuthTokens) {
+    try {
+      await new Promise(resolve => {
+        const p = chrome.identity.clearAllCachedAuthTokens();
+        if (p && p.then) p.then(resolve).catch(resolve);
+        else resolve();
+      });
+    } catch {}
+  } else {
     chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
   emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
@@ -455,7 +486,7 @@ async function confirmDeleteForever() {
 
   // Force a fresh token -- the cached one may lack https://mail.google.com/ scope.
   try {
-    chrome.identity.removeCachedAuthToken({ token });
+    if (chrome.identity.clearAllCachedAuthTokens) chrome.identity.clearAllCachedAuthTokens(() => {}); else chrome.identity.removeCachedAuthToken({ token });
     token = await getToken(true);
   } catch (e) {
     showToast('Could not refresh auth. Please sign in again.', true);
@@ -507,7 +538,11 @@ function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
   const oldToken = token;
   token = null;
-  chrome.identity.removeCachedAuthToken({ token: oldToken });
+  if (chrome.identity.clearAllCachedAuthTokens) {
+    chrome.identity.clearAllCachedAuthTokens(() => {});
+  } else {
+    chrome.identity.removeCachedAuthToken({ token: oldToken });
+  }
   setTimeout(showAuth, 2200);
 }
 
@@ -791,4 +826,7 @@ function escHtml(t) {
   d.textContent = t;
   return d.innerHTML;
 }
+
+
+
 
