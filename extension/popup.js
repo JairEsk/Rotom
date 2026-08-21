@@ -146,7 +146,7 @@ async function switchAccount() {
       });
     } catch {}
   }
-  btn.disabled = false; btn.textContent = 'Switch Account';
+  btn.disabled = false; btn.textContent = 'Use a different account';
   signIn();
 }
 
@@ -401,7 +401,7 @@ function updateSelection() {
   const unsubCapable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo).length;
   const bulkUnsubBtn = document.getElementById('unsub-bulk-btn');
   bulkUnsubBtn.disabled = unsubCapable === 0;
-  bulkUnsubBtn.textContent = unsubCapable > 0 ? 🚫 Unsubscribe (${unsubCapable}) : '🚫 Unsubscribe';
+  bulkUnsubBtn.textContent = unsubCapable > 0 ? `🚫 Unsubscribe (${unsubCapable})` : '🚫 Unsubscribe';
   document.getElementById('delete-btn').disabled = n === 0;
 
   const rec = document.getElementById('storage-recoverable');
@@ -700,7 +700,7 @@ async function executeUnsubscribe(email) {
       body: 'List-Unsubscribe=One-Click'
     });
     if (!response.ok) {
-      throw new Error(Unsubscribe POST failed: HTTP );
+      throw new Error(`Unsubscribe POST failed: HTTP ${response.status}`);
     }
     return;
   }
