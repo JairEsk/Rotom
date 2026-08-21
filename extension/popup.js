@@ -51,7 +51,6 @@ const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-fi
 // --- Boot: wire all static listeners once ---
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sign-in-btn').addEventListener('click', signIn);
-  document.getElementById('switch-account-btn').addEventListener('click', switchAccount);
   document.getElementById('scan-btn').addEventListener('click', scanEmails);
   document.getElementById('select-all-btn').addEventListener('click', toggleSelectAll);
   document.getElementById('trash-btn').addEventListener('click', openTrashModal);
@@ -128,26 +127,6 @@ async function signIn() {
     btn.disabled = false; btn.textContent = 'Connect Gmail';
     showEl('auth-error', e.message || 'Authorization failed.');
   }
-}
-
-async function switchAccount() {
-  const btn = document.getElementById('switch-account-btn');
-  btn.disabled = true; btn.textContent = 'Switching...';
-  if (token) {
-    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' }); } catch {}
-    token = null;
-  }
-  if (chrome.identity.clearAllCachedAuthTokens) {
-    try {
-      await new Promise(resolve => {
-        const p = chrome.identity.clearAllCachedAuthTokens();
-        if (p && p.then) p.then(resolve).catch(resolve);
-        else resolve();
-      });
-    } catch {}
-  }
-  btn.disabled = false; btn.textContent = 'Use a different account';
-  signIn();
 }
 
 async function signOut() {
