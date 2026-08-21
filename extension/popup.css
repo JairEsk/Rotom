@@ -63,13 +63,13 @@ body {
   right: -50px;
 }
 
-/* ━━━ Scrollbar ━━━ */
+/* --- Scrollbar --- */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
 
-/* ━━━ Mixin de Liquid Glass ━━━ */
+/* --- Liquid Glass Mixin --- */
 .liquid-glass-panel {
   background: var(--glass-bg);
   /* Liquid Glass Refraction Effect */
@@ -87,7 +87,7 @@ body {
   border-radius: var(--radius-lg);
 }
 
-/* ━━━ Auth screen ━━━ */
+/* --- Auth screen --- */
 #auth-screen {
   display: flex;
   flex-direction: column;
@@ -141,7 +141,7 @@ body {
   line-height: 1.6;
 }
 
-/* ━━━ Header ━━━ */
+/* --- Header --- */
 header {
   display: flex;
   align-items: center;
@@ -181,7 +181,7 @@ header {
   white-space: nowrap;
 }
 
-/* ━━━ Storage banner ━━━ */
+/* --- Storage banner --- */
 .storage-banner {
   margin: 1rem;
   padding: 0.75rem 1rem;
@@ -194,7 +194,7 @@ header {
 
 .highlight { color: var(--success); font-weight: 600; text-shadow: 0 0 8px rgba(48, 209, 88, 0.4); }
 
-/* ━━━ Filters ━━━ */
+/* --- Filters --- */
 .filters {
   margin: 0 1rem 1rem 1rem;
   padding: 1.25rem;
@@ -258,7 +258,7 @@ header {
 }
 .filter-group select option { background: #1e293b; color: #fff; }
 
-/* /* ── Buttons ─────────────────────────────────────────────────────────────── */
+/* --- Buttons --- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -359,7 +359,7 @@ header {
 .btn-full { width: 100%; padding: 1rem; font-size: 1.05rem; border-radius: var(--radius-md); }
 .btn-sm { padding: 0.5rem 0.9rem; font-size: 0.8rem; border-radius: var(--radius-sm); }
 
-/* ━━━ Actions bar ━━━ */
+/* --- Actions bar --- */
 .actions-bar {
   margin: 0 1rem 1rem 1rem;
   padding: 0.75rem 1rem;
@@ -370,7 +370,7 @@ header {
 
 .count-label { margin-left: auto; font-size: 0.85rem; color: var(--muted); font-weight: 500; }
 
-/* ━━━ States ━━━ */
+/* --- States --- */
 .state-box {
   margin: 1rem;
   padding: 3rem 1rem;
@@ -384,7 +384,7 @@ header {
 .state-box p { color: var(--muted); font-size: 0.95rem; }
 .state-error p { color: var(--danger-h); }
 
-/* ━━━ Spinner ━━━ */
+/* --- Spinner --- */
 .spinner {
   width: 32px; height: 32px;
   border: 3px solid rgba(255,255,255,0.1);
@@ -395,7 +395,7 @@ header {
 .spinner-sm { width: 16px; height: 16px; border-width: 2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ━━━ Results table ━━━ */
+/* --- Results table --- */
 #results { 
   margin: 0 1rem 1rem 1rem; 
   overflow: hidden; 
@@ -479,10 +479,10 @@ input[type="checkbox"]:checked::after {
   border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
 
-/* ━━━ Load more ━━━ */
+/* --- Load more --- */
 .load-more-area { display: flex; justify-content: center; padding: 1rem; }
 
-/* ━━━ Modal ━━━ */
+/* --- Modal --- */
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.4);
@@ -522,7 +522,7 @@ input[type="checkbox"]:checked::after {
 .modal-warning { background: rgba(255, 69, 58, 0.15); color: #fff !important; border: 1px solid rgba(255, 69, 58, 0.4); }
 .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem; }
 
-/* ━━━ Toast ━━━ */
+/* --- Toast --- */
 .toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
   min-width: 260px; max-width: 460px; padding: 1rem 1.5rem;
@@ -546,3 +546,97 @@ input[type="checkbox"]:checked::after {
 }
 .error-msg { font-size: 0.85rem; color: var(--danger-h); text-align: center; margin-top: 0.5rem; }
 
+
+/* ─── Unsubscribe feature ─────────────────────────────────────────── */
+
+/* Teal left-border accent for rows that support unsubscribe */
+tbody tr.has-unsub {
+  border-left: 3px solid rgba(0, 210, 190, 0.7);
+}
+tbody tr[data-unsub-state="done"] {
+  border-left: 3px solid rgba(48, 209, 88, 0.5);
+  opacity: 0.7;
+}
+tbody tr[data-unsub-state="failed"] {
+  border-left: 3px solid rgba(255, 69, 58, 0.7);
+}
+tbody tr[data-unsub-state="pending"] {
+  border-left: 3px solid rgba(255, 159, 10, 0.7);
+}
+
+/* Actions column */
+.col-actions { width: 42px; text-align: center; }
+td.actions-cell { text-align: center; padding: 0.4rem 0.5rem; }
+
+/* Unsub button per row */
+.unsub-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  line-height: 1;
+}
+tbody tr:hover .unsub-btn { opacity: 1; }
+tbody tr[data-unsub-state="done"]   .unsub-btn,
+tbody tr[data-unsub-state="pending"] .unsub-btn,
+tbody tr[data-unsub-state="failed"]  .unsub-btn { opacity: 1; }
+.unsub-btn:hover { background: rgba(0, 210, 190, 0.15); }
+.unsub-btn:disabled { cursor: default; }
+
+/* Bulk unsubscribe button */
+.btn-unsub {
+  background: rgba(0, 210, 190, 0.1);
+  color: #00d2be;
+  border-color: rgba(0, 210, 190, 0.25);
+}
+.btn-unsub:hover:not(:disabled) {
+  background: rgba(0, 210, 190, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 210, 190, 0.2);
+}
+
+/* First-use callout */
+.unsub-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 1rem 0.75rem 1rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 210, 190, 0.08);
+  border: 1px solid rgba(0, 210, 190, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.5;
+}
+.unsub-callout-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+.unsub-callout-dismiss:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+/* Modal checkbox label */
+.modal-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  margin-top: 0.75rem;
+}
+.modal-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}

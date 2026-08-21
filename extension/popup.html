@@ -50,7 +50,7 @@
     <div id="storage-banner" class="storage-banner liquid-glass-panel" style="display:none; margin-top: 1rem;">
       <span id="storage-messages"></span>
       <span id="storage-recoverable" style="display:none;">
-        &nbsp;·&nbsp;<span id="recoverable-size" class="highlight">0 B</span> recoverable
+        &nbsp;&middot;&nbsp;<span id="recoverable-size" class="highlight">0 B</span> recoverable
       </span>
     </div>
 
@@ -106,6 +106,7 @@
       <button id="trash-btn" class="btn btn-danger btn-sm" disabled>Trash</button>
       <button id="delete-btn" class="btn btn-delete btn-sm" disabled>Delete</button>
       <span id="selection-count" class="count-label">0 selected</span>
+      <button id="unsub-bulk-btn" class="btn btn-unsub btn-sm" disabled>🚫 Unsubscribe</button>
       <button id="empty-trash-btn" class="btn btn-empty-trash btn-sm">Empty Trash</button>
     </div>
 
@@ -124,10 +125,16 @@
       <button id="retry-btn" class="btn btn-secondary btn-sm">Retry</button>
     </div>
 
+    <!-- Unsubscribe first-use callout -->
+    <div id="unsub-callout" class="unsub-callout" style="display:none;">
+      <span>&#x1F6AB; <strong>Unsubscribe</strong> stops future emails &nbsp;&middot;&nbsp; &#x1F5D1; <strong>Trash</strong> removes existing ones &nbsp;&middot;&nbsp; both can be done together</span>
+      <button id="unsub-callout-dismiss" class="unsub-callout-dismiss" aria-label="Dismiss">&#x2715;</button>
+    </div>
+
     <!-- Results table -->
     <div id="results" class="liquid-glass-panel" style="display:none;">
       <div class="results-header">
-        <span>Found <strong id="email-count">0</strong> emails &nbsp;·&nbsp; <span id="total-size" class="highlight">0 B</span></span>
+        <span>Found <strong id="email-count">0</strong> emails &nbsp;&middot;&nbsp; <span id="total-size" class="highlight">0 B</span></span>
       </div>
       <table>
         <thead>
@@ -137,6 +144,7 @@
             <th class="col-subject">Subject</th>
             <th class="col-date">Date</th>
             <th class="col-size">Size</th>
+            <th class="col-actions"></th>
           </tr>
         </thead>
         <tbody id="email-body"></tbody>
@@ -185,6 +193,38 @@
       <div class="modal-actions">
         <button id="cancel-empty-trash-btn" class="btn btn-ghost">Cancel</button>
         <button id="confirm-empty-trash-btn" class="btn btn-delete">Yes, empty trash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unsubscribe single modal -->
+  <div id="unsub-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>&#x1F6AB; Unsubscribe?</h3>
+      <p>This will send an opt-out request to <strong><span id="unsub-sender-name"></span></strong>.</p>
+      <p class="modal-note">Future emails from this sender should stop within a few days. This cannot be guaranteed.</p>
+      <label class="modal-checkbox-label">
+        <input type="checkbox" id="unsub-also-trash"> Also move this email to Trash
+      </label>
+      <div class="modal-actions">
+        <button id="cancel-unsub-btn" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-unsub-btn" class="btn btn-unsub">Unsubscribe</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk unsubscribe modal -->
+  <div id="bulk-unsub-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <h3>&#x1F6AB; Bulk Unsubscribe?</h3>
+      <p>This will send opt-out requests to <strong><span id="bulk-unsub-count">0</span> sender(s)</strong>.</p>
+      <p class="modal-note">Only emails that support unsubscribe are included. Future emails should stop within a few days.</p>
+      <label class="modal-checkbox-label">
+        <input type="checkbox" id="bulk-unsub-also-trash"> Also move these emails to Trash
+      </label>
+      <div class="modal-actions">
+        <button id="cancel-bulk-unsub-btn" class="btn btn-ghost">Cancel</button>
+        <button id="confirm-bulk-unsub-btn" class="btn btn-unsub">Unsubscribe All</button>
       </div>
     </div>
   </div>
