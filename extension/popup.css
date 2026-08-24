@@ -456,6 +456,9 @@ td.subject-cell { max-width: 170px; color: var(--muted); }
 .subject-link { color: var(--text); text-decoration: none; transition: color 0.2s; }
 .subject-link:hover { color: var(--blue-h); text-decoration: underline; }
 
+.sender-filter-link { color: inherit; text-decoration: none; transition: color 0.2s; cursor: pointer; outline: none; }
+.sender-filter-link:hover { color: var(--blue-h); text-decoration: underline; }
+
 /* Custom Checkbox squircle style */
 input[type="checkbox"] {
   appearance: none;
