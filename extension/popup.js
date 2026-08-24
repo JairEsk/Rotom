@@ -352,7 +352,9 @@ function appendEmailRow(body, email) {
   if (email.unsubscribeInfo) tr.classList.add('has-unsub');
   tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
-    <td class="from-cell" title="${escHtml(email.from)}">${escHtml(email.from)}</td>
+    <td class="from-cell" title="${escHtml(email.from)}">
+      <a href="#" class="sender-filter-link" title="Click to filter by this sender">${escHtml(email.from)}</a>
+    </td>
     <td class="subject-cell" title="${escHtml(email.subject)}">
       <a class="subject-link" href="${gmailLink}" target="_blank">${escHtml(email.subject) || '<em>no subject</em>'}</a>
     </td>
@@ -367,6 +369,18 @@ function appendEmailRow(body, email) {
     syncHeaderCheckbox();
     updateSelection();
   });
+  
+  tr.querySelector('.sender-filter-link').addEventListener('click', e => {
+    e.preventDefault();
+    // Extract email from formats like "Name <email@domain.com>"
+    const match = email.from.match(/<([^>]+)>/);
+    const exactEmail = match ? match[1] : email.from;
+    
+    document.getElementById('sender-filter').value = exactEmail;
+    saveFilters();
+    scanEmails(); // Auto-trigger scan
+  });
+
   body.appendChild(tr);
   if (email.unsubscribeInfo) {
     const unsubBtnEl = tr.querySelector('.unsub-btn');
@@ -601,11 +615,16 @@ function formatDate(raw) {
   try {
     const date = new Date(raw);
     const now = new Date();
-    const diff = now - date;
-    const days = Math.floor(diff / 86400000);
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 365) return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    
+    // Normalize to midnight for accurate calendar day differences
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const emailDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffTime = today - emailDay;
+    const diffDays = Math.round(diffTime / 86400000);
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 365) return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
   } catch {
     return '';
