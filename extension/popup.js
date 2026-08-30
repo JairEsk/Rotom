@@ -1,19 +1,32 @@
 // --- Gmail API helpers ---
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
+async function fetchWithBackoff(url, options, retries = 4, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, options);
+    if (res.status === 429 && i < retries - 1) {
+      const waitTime = delay * Math.pow(2, i) + Math.random() * 500;
+      await new Promise(r => setTimeout(r, waitTime));
+      continue;
+    }
+    return res;
+  }
+  return fetch(url, options); // fallback on last try
+}
+
 async function gmailGet(path, token, params = {}) {
   const url = new URL(`${GMAIL}/${path}`);
   Object.entries(params).forEach(([k, v]) => {
     if (Array.isArray(v)) { v.forEach(val => url.searchParams.append(k, val)); } else if (v !== undefined && v !== '') { url.searchParams.set(k, v); }
   });
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetchWithBackoff(url, { headers: { Authorization: `Bearer ${token}` } });
   if (res.status === 401) throw new AuthError();
   if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || 'API error'); }
   return res.json();
 }
 
 async function gmailPost(path, token, body) {
-  const res = await fetch(`${GMAIL}/${path}`, {
+  const res = await fetchWithBackoff(`${GMAIL}/${path}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
@@ -24,7 +37,7 @@ async function gmailPost(path, token, body) {
 }
 
 async function gmailDelete(path, token) {
-  const res = await fetch(`${GMAIL}/${path}`, {
+  const res = await fetchWithBackoff(`${GMAIL}/${path}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -33,6 +46,53 @@ async function gmailDelete(path, token) {
     const e = await res.json();
     throw new Error(e.error?.message || 'API error');
   }
+}
+
+async function gmailBatchGet(ids, token) {
+  if (ids.length === 0) return [];
+  const boundary = 'batch_gmail_req_boundary';
+  let body = '';
+  ids.forEach((id, index) => {
+    body += `--${boundary}\r\n`;
+    body += `Content-Type: application/http\r\n`;
+    body += `Content-ID: <item-${index}>\r\n\r\n`;
+    body += `GET /gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post HTTP/1.1\r\n\r\n`;
+  });
+  body += `--${boundary}--\r\n`;
+
+  const res = await fetchWithBackoff('https://gmail.googleapis.com/batch/gmail/v1', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': `multipart/mixed; boundary="${boundary}"`
+    },
+    body: body
+  });
+
+  if (res.status === 401) throw new AuthError();
+  if (!res.ok) {
+    throw new Error(`Batch API error: ${res.status}`);
+  }
+  
+  const text = await res.text();
+  // Extract response boundary from Content-Type if possible, or fallback to simple split
+  const matchBoundary = res.headers.get('content-type')?.match(/boundary=([^;]+)/);
+  const resBoundary = matchBoundary ? `--${matchBoundary[1].replace(/["']/g, '')}` : `--${boundary}`;
+  
+  const parts = text.split(resBoundary);
+  const messages = [];
+  parts.forEach(part => {
+    if (part.includes('HTTP/1.1 200 OK')) {
+      const match = part.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          const msg = JSON.parse(match[0]);
+          if (msg.id) messages.push(msg);
+        } catch(e) {}
+      }
+    }
+  });
+  return messages;
 }
 
 class AuthError extends Error { constructor() { super('auth'); } }
@@ -302,22 +362,7 @@ function updateResultsHeader() {
     formatBytes(emails.reduce((s, e) => s + e.estimatedSize, 0));
 }
 
-async function fetchMetadataBatch(msgs) {
-  const CHUNK = 5;
-  const results = [];
-  for (let i = 0; i < msgs.length; i += CHUNK) {
-    const chunk = msgs.slice(i, i + CHUNK);
-    const fetched = await Promise.all(chunk.map(m => fetchEmailItem(m.id)));
-    results.push(...fetched);
-  }
-  return results;
-}
-
-async function fetchEmailItem(id) {
-  const msg = await gmailGet(`messages/${id}`, token, {
-    format: 'metadata',
-    metadataHeaders: ['Subject', 'From', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
-  });
+function parseEmailItem(msg) {
   let subject = '', sender = '', date = '';
   (msg.payload?.headers || []).forEach(header => {
     const name = header.name.toLowerCase();
@@ -328,6 +373,21 @@ async function fetchEmailItem(id) {
   const size = msg.sizeEstimate || 0;
   const unsubscribeInfo = parseUnsubscribeHeader(msg.payload?.headers || []);
   return { id: msg.id, subject, from: sender, date, estimatedSize: size, readableSize: formatBytes(size), unsubscribeInfo };
+}
+
+async function fetchMetadataBatch(msgs) {
+  const ids = msgs.map(m => m.id);
+  // We can do them all in a single batch request!
+  const batchRes = await gmailBatchGet(ids, token);
+  return batchRes.map(parseEmailItem);
+}
+
+async function fetchEmailItem(id) {
+  const msg = await gmailGet(`messages/${id}`, token, {
+    format: 'metadata',
+    metadataHeaders: ['Subject', 'From', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
+  });
+  return parseEmailItem(msg);
 }
 
 // --- Render ---
@@ -451,22 +511,16 @@ async function confirmTrash() {
   let firstError = null;
 
   try {
-    for (let i = 0; i < total; i += 5) {
-      const chunk = ids.slice(i, i + 5);
+    for (let i = 0; i < total; i += 1000) {
+      const chunk = ids.slice(i, i + 1000);
       btn.textContent = `Trashing (${processed}/${total})...`;
       
-      const results = await Promise.allSettled(
-        chunk.map(id => gmailPost(`messages/${id}/trash`, token, {}))
-      );
-      
-      chunk.forEach((id, idx) => {
-        if (results[idx].status === 'fulfilled') {
-          succeeded.push(id);
-        } else if (!firstError) {
-          firstError = results[idx].reason;
-        }
-      });
-      
+      try {
+        await gmailPost('messages/batchModify', token, { ids: chunk, addLabelIds: ['TRASH'] });
+        succeeded.push(...chunk);
+      } catch (err) {
+        if (!firstError) firstError = err;
+      }
       processed += chunk.length;
     }
     
@@ -515,22 +569,16 @@ async function confirmDeleteForever() {
   let firstError = null;
 
   try {
-    for (let i = 0; i < total; i += 5) {
-      const chunk = ids.slice(i, i + 5);
+    for (let i = 0; i < total; i += 1000) {
+      const chunk = ids.slice(i, i + 1000);
       btn.textContent = `Deleting (${processed}/${total})...`;
       
-      const results = await Promise.allSettled(
-        chunk.map(id => gmailDelete(`messages/${id}`, token))
-      );
-      
-      chunk.forEach((id, idx) => {
-        if (results[idx].status === 'fulfilled') {
-          succeeded.push(id);
-        } else if (!firstError) {
-          firstError = results[idx].reason;
-        }
-      });
-      
+      try {
+        await gmailPost('messages/batchDelete', token, { ids: chunk });
+        succeeded.push(...chunk);
+      } catch (err) {
+        if (!firstError) firstError = err;
+      }
       processed += chunk.length;
     }
     
@@ -659,14 +707,15 @@ async function confirmEmptyTrash() {
 
     let deleted = 0;
     let firstError = null;
-    for (let i = 0; i < allIds.length; i += 5) {
-      const chunk = allIds.slice(i, i + 5);
+    for (let i = 0; i < allIds.length; i += 1000) {
+      const chunk = allIds.slice(i, i + 1000);
       btn.textContent = 'Emptying (' + deleted + '/' + allIds.length + ')...';
-      const results = await Promise.allSettled(chunk.map(id => gmailDelete('messages/' + id, token)));
-      results.forEach((r) => {
-        if (r.status === 'fulfilled') { deleted++; }
-        else if (!firstError) { firstError = r.reason; }
-      });
+      try {
+        await gmailPost('messages/batchDelete', token, { ids: chunk });
+        deleted += chunk.length;
+      } catch (err) {
+        if (!firstError) firstError = err;
+      }
     }
 
     const failed = allIds.length - deleted;
@@ -767,7 +816,7 @@ async function confirmUnsubscribe() {
     showToast(`Unsubscribe request sent to ${senderName}`);
 
     if (alsoTrash) {
-      await gmailPost(`messages/${emailId}/trash`, token, {});
+      await gmailPost('messages/batchModify', token, { ids: [emailId], addLabelIds: ['TRASH'] });
       removeFromList([emailId]);
     }
   } catch (err) {
@@ -814,8 +863,8 @@ async function confirmBulkUnsubscribe() {
   else showToast('All unsubscribe requests failed.', true);
 
   if (alsoTrash && succeeded.length) {
-    for (let i = 0; i < succeeded.length; i += 5) {
-      await Promise.allSettled(succeeded.slice(i, i + 5).map(id => gmailPost(`messages/${id}/trash`, token, {})));
+    for (let i = 0; i < succeeded.length; i += 1000) {
+      await gmailPost('messages/batchModify', token, { ids: succeeded.slice(i, i + 1000), addLabelIds: ['TRASH'] }).catch(() => {});
     }
     removeFromList(succeeded);
   }
