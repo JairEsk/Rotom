@@ -1,0 +1,22 @@
+{
+  "name": "jair-recursive-demon-sorcerer",
+  "version": "1.0.0",
+  "description": "**Remover Of Trash & Obsolete Mails**",
+  "main": "test_batch.js",
+  "scripts": {
+    "test": "vitest run",
+    "build": "esbuild src/popup.js --bundle --outfile=extension/popup.js && esbuild src/background.js --bundle --outfile=extension/background.js",
+    "lint": "eslint src/**/*.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^17.11.0",
+    "vitest": "^4.1.11"
+  }
+}
