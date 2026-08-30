@@ -10,7 +10,7 @@ Rotom is a Chrome extension that helps you reclaim your Gmail storage by scannin
 - **Bulk Trash / Delete Forever** — Act on dozens of emails in one click
 - **Recoverable size indicator** — See how much space you'd free before you commit
 - **Storage overview** — Total message count for your connected account
-- **Dark-themed popup** — Clean, fast, 520 px wide popup UI
+- **Dark-themed popup** — Clean, fast, 540 px wide popup UI
 
 ## Tech Stack
 
@@ -44,7 +44,7 @@ Because the extension calls the Gmail API on your behalf, you need a Google Clou
 
 1. Go to **APIs & Services → OAuth consent screen**.
 2. Select **External**, fill in the app name and your email.
-3. Add the scope `https://www.googleapis.com/auth/gmail.modify`.
+3. Add the scope `https://mail.google.com/`.
 4. Under **Test users**, add your Gmail address.
 
 ### 3. Create OAuth Credentials for a Chrome Extension
