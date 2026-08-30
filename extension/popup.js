@@ -43,7 +43,6 @@ let emails        = [];
 let selectedIds   = new Set();
 let nextPageToken = null;
 let currentQuery  = '';
-let lastPageCount = 0;
 let hasMorePages  = false;
 
 const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-filter'];
@@ -133,9 +132,10 @@ async function signIn() {
 async function switchAccount() {
   const btn = document.getElementById('switch-account-btn');
   btn.disabled = true; btn.textContent = 'Switching...';
-  if (token) {
-    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, { method: 'POST' }); } catch {}
-    token = null;
+  const oldToken = token;
+  token = null;
+  if (oldToken) {
+    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' }); } catch {}
   }
   if (chrome.identity.clearAllCachedAuthTokens) {
     try {
@@ -145,15 +145,17 @@ async function switchAccount() {
         else resolve();
       });
     } catch {}
+  } else if (oldToken) {
+    chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
   btn.disabled = false; btn.textContent = 'Use a different account';
   signIn();
 }
 
 async function signOut() {
-  if (token) {
-    const oldToken = token;
-    token = null;
+  const oldToken = token;
+  token = null;
+  if (oldToken) {
     try {
       await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' });
     } catch {}
@@ -166,10 +168,11 @@ async function signOut() {
         else resolve();
       });
     } catch {}
-  } else {
+  } else if (oldToken) {
     chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
-  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
+  emails = []; selectedIds.clear(); nextPageToken = null; hasMorePages = false;
+  hideSection();
   showAuth();
 }
 
@@ -230,7 +233,7 @@ function buildQuery() {
 
 // --- Scan ---
 async function scanEmails() {
-  emails = []; selectedIds.clear(); nextPageToken = null; lastPageCount = 0; hasMorePages = false;
+  emails = []; selectedIds.clear(); nextPageToken = null; hasMorePages = false;
   currentQuery = buildQuery();
   hideSection();
   show('loading');
@@ -260,21 +263,22 @@ async function fetchPage(isFirst) {
 
     if (!listRes.messages || listRes.messages.length === 0) {
       if (isFirst) show('empty-state');
+      hide('load-more-area');
       return;
     }
 
     const items = await fetchMetadataBatch(listRes.messages);
-    items.sort((a, b) => b.estimatedSize - a.estimatedSize);
-
-    lastPageCount = items.length;
     emails.push(...items);
+    emails.sort((a, b) => b.estimatedSize - a.estimatedSize);
+
     nextPageToken  = listRes.nextPageToken || null;
     hasMorePages   = !!nextPageToken;
 
-    renderEmails(isFirst);
+    renderEmails();
     show('results');
     show('actions-bar');
     updateResultsHeader();
+    updateSelection();
 
     document.getElementById('load-more-area').style.display = hasMorePages ? 'flex' : 'none';
 
@@ -327,17 +331,11 @@ async function fetchEmailItem(id) {
 }
 
 // --- Render ---
-function renderEmails(replace) {
+function renderEmails() {
   const body = document.getElementById('email-body');
-  if (replace) {
-    body.innerHTML = '';
-    emails.forEach(email => appendEmailRow(body, email));
-  } else {
-    // Fixed: use lastPageCount to only append the newly fetched items
-    emails.slice(emails.length - lastPageCount).forEach(email => appendEmailRow(body, email));
-    // Fixed: reconcile header checkbox state after appending new (unchecked) rows
-    syncHeaderCheckbox();
-  }
+  body.innerHTML = '';
+  emails.forEach(email => appendEmailRow(body, email));
+  syncHeaderCheckbox();
 }
 
 function appendEmailRow(body, email) {
@@ -385,6 +383,9 @@ function appendEmailRow(body, email) {
   if (email.unsubscribeInfo) {
     const unsubBtnEl = tr.querySelector('.unsub-btn');
     if (unsubBtnEl) unsubBtnEl.addEventListener('click', () => openUnsubscribeModal(email));
+    if (email.unsubscribeInfo.status) {
+      setRowUnsubState(email.id, email.unsubscribeInfo.status);
+    }
   }
 }
 
@@ -579,7 +580,7 @@ function removeFromList(ids) {
 }
 
 function hideSection() {
-  ['loading', 'results', 'empty-state', 'error-state'].forEach(hide);
+  ['loading', 'results', 'empty-state', 'error-state', 'load-more-area', 'load-more-loading'].forEach(hide);
 }
 
 function showError(msg) {
