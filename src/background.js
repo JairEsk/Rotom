@@ -23,7 +23,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   
   if (msg.type === 'GET_JOB_STATUS') {
-    sendResponse(jobs[msg.jobId] || null);
+    const job = jobs[msg.jobId];
+    sendResponse(job || null);
+    if (job && (job.status === 'done' || job.status === 'error')) {
+      delete jobs[msg.jobId]; // Limpiar para evitar memory leak
+    }
     return false;
   }
   
