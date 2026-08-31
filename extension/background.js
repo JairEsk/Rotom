@@ -66,7 +66,11 @@
       return false;
     }
     if (msg.type === "GET_JOB_STATUS") {
-      sendResponse(jobs[msg.jobId] || null);
+      const job = jobs[msg.jobId];
+      sendResponse(job || null);
+      if (job && (job.status === "done" || job.status === "error")) {
+        delete jobs[msg.jobId];
+      }
       return false;
     }
     if (msg.type === "EXECUTE_UNSUBSCRIBE") {
