@@ -39,29 +39,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+async function processInBatches(ids, job, processChunk) {
+  job.total = ids.length;
+  for (let i = 0; i < ids.length; i += 1000) {
+    const chunk = ids.slice(i, i + 1000);
+    await processChunk(chunk);
+    job.succeeded.push(...chunk);
+    job.processed += chunk.length;
+  }
+}
+
 async function runJob(jobId, action, payload) {
   const job = jobs[jobId];
   const { token, ids } = payload;
   
   try {
     if (action === 'TRASH') {
-      const total = ids.length;
-      job.total = total;
-      for (let i = 0; i < total; i += 1000) {
-        const chunk = ids.slice(i, i + 1000);
-        await gmailPost('messages/batchModify', token, { ids: chunk, addLabelIds: ['TRASH'] });
-        job.succeeded.push(...chunk);
-        job.processed += chunk.length;
-      }
+      await processInBatches(ids, job, chunk => 
+        gmailPost('messages/batchModify', token, { ids: chunk, addLabelIds: ['TRASH'] })
+      );
     } else if (action === 'DELETE_FOREVER') {
-      const total = ids.length;
-      job.total = total;
-      for (let i = 0; i < total; i += 1000) {
-        const chunk = ids.slice(i, i + 1000);
-        await gmailPost('messages/batchDelete', token, { ids: chunk });
-        job.succeeded.push(...chunk);
-        job.processed += chunk.length;
-      }
+      await processInBatches(ids, job, chunk => 
+        gmailPost('messages/batchDelete', token, { ids: chunk })
+      );
     } else if (action === 'EMPTY_TRASH') {
       let pageToken = undefined;
       let allIds = [];
@@ -71,18 +71,9 @@ async function runJob(jobId, action, payload) {
         pageToken = res.nextPageToken;
       } while (pageToken);
       
-      job.total = allIds.length;
-      if (allIds.length === 0) {
-        job.status = 'done';
-        return;
-      }
-
-      for (let i = 0; i < allIds.length; i += 1000) {
-        const chunk = allIds.slice(i, i + 1000);
-        await gmailPost('messages/batchDelete', token, { ids: chunk });
-        job.succeeded.push(...chunk);
-        job.processed += chunk.length;
-      }
+      await processInBatches(allIds, job, chunk => 
+        gmailPost('messages/batchDelete', token, { ids: chunk })
+      );
     }
     
     job.status = 'done';
