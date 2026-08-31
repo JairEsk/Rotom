@@ -133,6 +133,30 @@ async function switchAccount() {
   btn.disabled = true; btn.textContent = 'Switching...';
   const oldToken = token;
   token = null;
+  await clearAuthToken(oldToken);
+  btn.disabled = false; btn.textContent = 'Use a different account';
+  signIn();
+}
+
+async function signOut() {
+  const oldToken = token;
+  token = null;
+  await clearAuthToken(oldToken);
+  emails = []; selectedIds.clear(); nextPageToken = null; hasMorePages = false;
+  hideSection();
+  showAuth();
+}
+
+function getToken(interactive) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive }, (t) => {
+      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+      else resolve(t);
+    });
+  });
+}
+
+async function clearAuthToken(oldToken) {
   if (oldToken) {
     try { await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' }); } catch {}
   }
@@ -147,41 +171,6 @@ async function switchAccount() {
   } else if (oldToken) {
     chrome.identity.removeCachedAuthToken({ token: oldToken });
   }
-  btn.disabled = false; btn.textContent = 'Use a different account';
-  signIn();
-}
-
-async function signOut() {
-  const oldToken = token;
-  token = null;
-  if (oldToken) {
-    try {
-      await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' });
-    } catch {}
-  }
-  if (chrome.identity.clearAllCachedAuthTokens) {
-    try {
-      await new Promise(resolve => {
-        const p = chrome.identity.clearAllCachedAuthTokens();
-        if (p && p.then) p.then(resolve).catch(resolve);
-        else resolve();
-      });
-    } catch {}
-  } else if (oldToken) {
-    chrome.identity.removeCachedAuthToken({ token: oldToken });
-  }
-  emails = []; selectedIds.clear(); nextPageToken = null; hasMorePages = false;
-  hideSection();
-  showAuth();
-}
-
-function getToken(interactive) {
-  return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({ interactive }, (t) => {
-      if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-      else resolve(t);
-    });
-  });
 }
 
 // --- App screen ---
@@ -477,7 +466,7 @@ async function confirmDeleteForever() {
   btn.disabled = true;
 
   try {
-    if (chrome.identity.clearAllCachedAuthTokens) chrome.identity.clearAllCachedAuthTokens(() => {}); else chrome.identity.removeCachedAuthToken({ token });
+    await clearAuthToken(token);
     token = await getToken(true);
   } catch (e) {
     showToast('Could not refresh auth. Please sign in again.', true);
@@ -507,11 +496,7 @@ function handleSessionExpired() {
   showToast('Session expired. Please sign in again.', true);
   const oldToken = token;
   token = null;
-  if (chrome.identity.clearAllCachedAuthTokens) {
-    chrome.identity.clearAllCachedAuthTokens(() => {});
-  } else {
-    chrome.identity.removeCachedAuthToken({ token: oldToken });
-  }
+  clearAuthToken(oldToken);
   setTimeout(showAuth, 2200);
 }
 
