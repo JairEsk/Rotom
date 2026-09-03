@@ -6,7 +6,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 const STALE_JOB_TIMEOUT_MS = 60000;
 
-// Persistencia en storage.session para sobrevivir a la suspensión del Service Worker en MV3
+// Persist jobs in storage.session across transient service worker restarts
 async function getJob(jobId) {
   const data = await chrome.storage.session.get(jobId);
   const job = data[jobId] || null;
@@ -42,14 +42,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       runJob(jobId, msg.action, msg.payload);
     });
 
-    return true; // Canal asíncrono para saveJob
+    return true; // Keep message channel open for async saveJob
   }
   
   if (msg.type === 'GET_JOB_STATUS') {
     getJob(msg.jobId).then((job) => {
       sendResponse(job || null);
     });
-    return true; // Canal asíncrono para getJob
+    return true; // Keep message channel open for async getJob
   }
   
   if (msg.type === 'CLEAR_JOB') {
