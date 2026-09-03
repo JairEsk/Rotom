@@ -53,81 +53,133 @@
   chrome.runtime.onInstalled.addListener(() => {
     console.log("R.O.T.O.M. installed.");
   });
-  var jobs = {};
+  var STALE_JOB_TIMEOUT_MS = 6e4;
+  async function getJob(jobId) {
+    const data = await chrome.storage.session.get(jobId);
+    const job = data[jobId] || null;
+    if (job && job.status === "running" && Date.now() - (job.updatedAt || 0) > STALE_JOB_TIMEOUT_MS) {
+      job.status = "error";
+      job.error = "Service worker suspended unexpectedly";
+      await saveJob(jobId, job);
+    }
+    return job;
+  }
+  async function saveJob(jobId, job) {
+    await chrome.storage.session.set({ [jobId]: job });
+  }
+  async function deleteJob(jobId) {
+    await chrome.storage.session.remove(jobId);
+  }
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "START_JOB") {
       const jobId = Date.now().toString();
-      jobs[jobId] = { status: "running", processed: 0, total: msg.payload.ids?.length || 0, succeeded: [], failed: 0 };
-      runJob(jobId, msg.action, msg.payload).catch((err) => {
-        console.error("Job failed:", err);
-        if (jobs[jobId]) jobs[jobId].error = err.message;
+      const initialJob = {
+        status: "running",
+        processed: 0,
+        total: msg.payload.ids?.length || 0,
+        failed: 0,
+        updatedAt: Date.now()
+      };
+      saveJob(jobId, initialJob).then(() => {
+        sendResponse({ jobId });
+        runJob(jobId, msg.action, msg.payload);
       });
-      sendResponse({ jobId });
-      return false;
+      return true;
     }
     if (msg.type === "GET_JOB_STATUS") {
-      const job = jobs[msg.jobId];
-      sendResponse(job || null);
-      if (job && (job.status === "done" || job.status === "error")) {
-        delete jobs[msg.jobId];
-      }
-      return false;
+      getJob(msg.jobId).then((job) => {
+        sendResponse(job || null);
+      });
+      return true;
+    }
+    if (msg.type === "CLEAR_JOB") {
+      deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
+      return true;
     }
     if (msg.type === "EXECUTE_UNSUBSCRIBE") {
       executeUnsubscribe(msg.payload.email, msg.payload.token).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     }
   });
+  async function processInBatches(ids, jobId, processChunk, succeededOut = []) {
+    const job = await getJob(jobId);
+    if (!job) return succeededOut;
+    job.total = ids.length;
+    job.updatedAt = Date.now();
+    await saveJob(jobId, job);
+    for (let i = 0; i < ids.length; i += 1e3) {
+      const chunk = ids.slice(i, i + 1e3);
+      try {
+        await processChunk(chunk);
+        succeededOut.push(...chunk);
+      } catch (err) {
+        console.error("Batch chunk error:", err);
+        job.failed += chunk.length;
+        if (err instanceof AuthError) throw err;
+      }
+      job.processed += chunk.length;
+      job.updatedAt = Date.now();
+      await saveJob(jobId, job);
+    }
+    return succeededOut;
+  }
   async function runJob(jobId, action, payload) {
-    const job = jobs[jobId];
     const { token, ids } = payload;
+    const succeeded = [];
     try {
       if (action === "TRASH") {
-        const total = ids.length;
-        job.total = total;
-        for (let i = 0; i < total; i += 1e3) {
-          const chunk = ids.slice(i, i + 1e3);
-          await gmailPost("messages/batchModify", token, { ids: chunk, addLabelIds: ["TRASH"] });
-          job.succeeded.push(...chunk);
-          job.processed += chunk.length;
-        }
+        await processInBatches(
+          ids,
+          jobId,
+          (chunk) => gmailPost("messages/batchModify", token, { ids: chunk, addLabelIds: ["TRASH"] }),
+          succeeded
+        );
       } else if (action === "DELETE_FOREVER") {
-        const total = ids.length;
-        job.total = total;
-        for (let i = 0; i < total; i += 1e3) {
-          const chunk = ids.slice(i, i + 1e3);
-          await gmailPost("messages/batchDelete", token, { ids: chunk });
-          job.succeeded.push(...chunk);
-          job.processed += chunk.length;
-        }
+        await processInBatches(
+          ids,
+          jobId,
+          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk }),
+          succeeded
+        );
       } else if (action === "EMPTY_TRASH") {
         let pageToken = void 0;
         let allIds = [];
         do {
-          const res = await gmailGet("messages", token, { labelIds: "TRASH", maxResults: 500, pageToken });
+          const res = await gmailGet("messages", token, { labelIds: "TRASH", maxResults: 500, pageToken, includeSpamTrash: true });
           if (res.messages) allIds.push(...res.messages.map((m) => m.id));
           pageToken = res.nextPageToken;
+          const currentJob = await getJob(jobId);
+          if (currentJob) {
+            currentJob.updatedAt = Date.now();
+            await saveJob(jobId, currentJob);
+          }
         } while (pageToken);
-        job.total = allIds.length;
-        if (allIds.length === 0) {
-          job.status = "done";
-          return;
-        }
-        for (let i = 0; i < allIds.length; i += 1e3) {
-          const chunk = allIds.slice(i, i + 1e3);
-          await gmailPost("messages/batchDelete", token, { ids: chunk });
-          job.succeeded.push(...chunk);
-          job.processed += chunk.length;
-        }
+        await processInBatches(
+          allIds,
+          jobId,
+          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk }),
+          succeeded
+        );
       }
-      job.status = "done";
+      const finalJob = await getJob(jobId);
+      if (finalJob) {
+        finalJob.succeeded = succeeded;
+        finalJob.status = finalJob.failed > 0 && finalJob.succeeded.length === 0 ? "error" : "done";
+        if (finalJob.status === "error" && !finalJob.error) {
+          finalJob.error = "All batch operations failed";
+        }
+        finalJob.updatedAt = Date.now();
+        await saveJob(jobId, finalJob);
+      }
     } catch (err) {
-      if (err instanceof AuthError) {
-        job.error = "AUTH_ERROR";
-      } else {
-        job.error = err.message;
+      const errorJob = await getJob(jobId);
+      if (errorJob) {
+        errorJob.status = "error";
+        errorJob.error = err instanceof AuthError ? "AUTH_ERROR" : err.message || "Unknown error";
+        errorJob.succeeded = succeeded;
+        errorJob.updatedAt = Date.now();
+        await saveJob(jobId, errorJob);
       }
-      job.status = "error";
     }
   }
   async function executeUnsubscribe(email, token) {
@@ -137,7 +189,7 @@
       if (!info.url.startsWith("https://")) {
         throw new Error("Unsubscribe URL is not HTTPS.");
       }
-      const response = await fetch(info.url, {
+      await fetch(info.url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "List-Unsubscribe=One-Click",

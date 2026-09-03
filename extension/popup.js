@@ -147,8 +147,12 @@
   }
   async function pollJob(jobId, onProgress) {
     return new Promise((resolve, reject) => {
+      let inFlight = false;
       const interval = setInterval(() => {
+        if (inFlight) return;
+        inFlight = true;
         chrome.runtime.sendMessage({ type: "GET_JOB_STATUS", jobId }, (job) => {
+          inFlight = false;
           if (!job) {
             clearInterval(interval);
             reject(new Error("Job not found"));
@@ -157,9 +161,11 @@
           if (onProgress) onProgress(job);
           if (job.status === "done") {
             clearInterval(interval);
+            chrome.runtime.sendMessage({ type: "CLEAR_JOB", jobId });
             resolve(job);
           } else if (job.status === "error") {
             clearInterval(interval);
+            chrome.runtime.sendMessage({ type: "CLEAR_JOB", jobId });
             if (job.error === "AUTH_ERROR") reject(new AuthError());
             else reject(new Error(job.error));
           }
@@ -540,15 +546,6 @@
     closeDeleteModal();
     const btn = document.getElementById("delete-btn");
     btn.disabled = true;
-    try {
-      await clearAuthToken(token);
-      token = await getToken(true);
-    } catch (e) {
-      showToast("Could not refresh auth. Please sign in again.", true);
-      btn.disabled = false;
-      btn.textContent = "Delete Forever";
-      return;
-    }
     try {
       const jobId = await startJob("DELETE_FOREVER", { token, ids });
       const jobResult = await pollJob(jobId, (job) => {
