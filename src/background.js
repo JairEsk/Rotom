@@ -4,10 +4,18 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('R.O.T.O.M. installed.');
 });
 
+const STALE_JOB_TIMEOUT_MS = 60000;
+
 // Persistencia en storage.session para sobrevivir a la suspensión del Service Worker en MV3
 async function getJob(jobId) {
   const data = await chrome.storage.session.get(jobId);
-  return data[jobId] || null;
+  const job = data[jobId] || null;
+  if (job && job.status === 'running' && Date.now() - (job.updatedAt || 0) > STALE_JOB_TIMEOUT_MS) {
+    job.status = 'error';
+    job.error = 'Service worker suspended unexpectedly';
+    await saveJob(jobId, job);
+  }
+  return job;
 }
 
 async function saveJob(jobId, job) {
@@ -26,7 +34,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       processed: 0,
       total: msg.payload.ids?.length || 0,
       succeeded: [],
-      failed: 0
+      failed: 0,
+      updatedAt: Date.now()
     };
 
     saveJob(jobId, initialJob).then(() => {
@@ -37,6 +46,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         if (job) {
           job.status = 'error';
           job.error = (err instanceof AuthError) ? 'AUTH_ERROR' : err.message;
+          job.updatedAt = Date.now();
           await saveJob(jobId, job);
         }
       });
@@ -67,6 +77,7 @@ async function processInBatches(ids, jobId, processChunk) {
   const job = await getJob(jobId);
   if (!job) return;
   job.total = ids.length;
+  job.updatedAt = Date.now();
   await saveJob(jobId, job);
 
   for (let i = 0; i < ids.length; i += 1000) {
@@ -80,6 +91,7 @@ async function processInBatches(ids, jobId, processChunk) {
       if (err instanceof AuthError) throw err;
     }
     job.processed += chunk.length;
+    job.updatedAt = Date.now();
     await saveJob(jobId, job);
   }
 }
@@ -103,6 +115,11 @@ async function runJob(jobId, action, payload) {
         const res = await gmailGet('messages', token, { labelIds: 'TRASH', maxResults: 500, pageToken, includeSpamTrash: true });
         if (res.messages) allIds.push(...res.messages.map(m => m.id));
         pageToken = res.nextPageToken;
+        const currentJob = await getJob(jobId);
+        if (currentJob) {
+          currentJob.updatedAt = Date.now();
+          await saveJob(jobId, currentJob);
+        }
       } while (pageToken);
       
       await processInBatches(allIds, jobId, chunk => 
@@ -116,6 +133,7 @@ async function runJob(jobId, action, payload) {
       if (finalJob.status === 'error' && !finalJob.error) {
         finalJob.error = 'All batch operations failed';
       }
+      finalJob.updatedAt = Date.now();
       await saveJob(jobId, finalJob);
     }
   } catch (err) {
@@ -123,6 +141,7 @@ async function runJob(jobId, action, payload) {
     if (errorJob) {
       errorJob.status = 'error';
       errorJob.error = (err instanceof AuthError) ? 'AUTH_ERROR' : (err.message || 'Unknown error');
+      errorJob.updatedAt = Date.now();
       await saveJob(jobId, errorJob);
     }
   }
