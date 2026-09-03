@@ -83,16 +83,7 @@
       };
       saveJob(jobId, initialJob).then(() => {
         sendResponse({ jobId });
-        runJob(jobId, msg.action, msg.payload).catch(async (err) => {
-          console.error("Job failed:", err);
-          const job = await getJob(jobId);
-          if (job) {
-            job.status = "error";
-            job.error = err instanceof AuthError ? "AUTH_ERROR" : err.message;
-            job.updatedAt = Date.now();
-            await saveJob(jobId, job);
-          }
-        });
+        runJob(jobId, msg.action, msg.payload);
       });
       return true;
     }
