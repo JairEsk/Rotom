@@ -541,15 +541,6 @@
     const btn = document.getElementById("delete-btn");
     btn.disabled = true;
     try {
-      await clearAuthToken(token);
-      token = await getToken(true);
-    } catch (e) {
-      showToast("Could not refresh auth. Please sign in again.", true);
-      btn.disabled = false;
-      btn.textContent = "Delete Forever";
-      return;
-    }
-    try {
       const jobId = await startJob("DELETE_FOREVER", { token, ids });
       const jobResult = await pollJob(jobId, (job) => {
         btn.textContent = `Deleting (${job.processed}/${job.total})...`;
