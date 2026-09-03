@@ -194,6 +194,7 @@
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "List-Unsubscribe=One-Click",
         mode: "no-cors"
+        // Crucial: bypasses CORS blocks
       });
       return;
     }

@@ -159,8 +159,9 @@ async function executeUnsubscribe(email, token) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'List-Unsubscribe=One-Click',
-      mode: 'no-cors'
+      mode: 'no-cors' // Crucial: bypasses CORS blocks
     });
+    // With no-cors, response is opaque (status 0). We assume success if it didn't throw network error.
     return;
   }
 
