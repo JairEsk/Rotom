@@ -77,7 +77,6 @@
         status: "running",
         processed: 0,
         total: msg.payload.ids?.length || 0,
-        succeeded: [],
         failed: 0,
         updatedAt: Date.now()
       };
@@ -102,9 +101,9 @@
       return true;
     }
   });
-  async function processInBatches(ids, jobId, processChunk) {
+  async function processInBatches(ids, jobId, processChunk, succeededOut = []) {
     const job = await getJob(jobId);
-    if (!job) return;
+    if (!job) return succeededOut;
     job.total = ids.length;
     job.updatedAt = Date.now();
     await saveJob(jobId, job);
@@ -112,7 +111,7 @@
       const chunk = ids.slice(i, i + 1e3);
       try {
         await processChunk(chunk);
-        job.succeeded.push(...chunk);
+        succeededOut.push(...chunk);
       } catch (err) {
         console.error("Batch chunk error:", err);
         job.failed += chunk.length;
@@ -122,21 +121,25 @@
       job.updatedAt = Date.now();
       await saveJob(jobId, job);
     }
+    return succeededOut;
   }
   async function runJob(jobId, action, payload) {
     const { token, ids } = payload;
+    const succeeded = [];
     try {
       if (action === "TRASH") {
         await processInBatches(
           ids,
           jobId,
-          (chunk) => gmailPost("messages/batchModify", token, { ids: chunk, addLabelIds: ["TRASH"] })
+          (chunk) => gmailPost("messages/batchModify", token, { ids: chunk, addLabelIds: ["TRASH"] }),
+          succeeded
         );
       } else if (action === "DELETE_FOREVER") {
         await processInBatches(
           ids,
           jobId,
-          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk })
+          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk }),
+          succeeded
         );
       } else if (action === "EMPTY_TRASH") {
         let pageToken = void 0;
@@ -154,11 +157,13 @@
         await processInBatches(
           allIds,
           jobId,
-          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk })
+          (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk }),
+          succeeded
         );
       }
       const finalJob = await getJob(jobId);
       if (finalJob) {
+        finalJob.succeeded = succeeded;
         finalJob.status = finalJob.failed > 0 && finalJob.succeeded.length === 0 ? "error" : "done";
         if (finalJob.status === "error" && !finalJob.error) {
           finalJob.error = "All batch operations failed";
@@ -171,6 +176,7 @@
       if (errorJob) {
         errorJob.status = "error";
         errorJob.error = err instanceof AuthError ? "AUTH_ERROR" : err.message || "Unknown error";
+        errorJob.succeeded = succeeded;
         errorJob.updatedAt = Date.now();
         await saveJob(jobId, errorJob);
       }
