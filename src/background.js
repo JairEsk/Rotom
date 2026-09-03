@@ -58,11 +58,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'GET_JOB_STATUS') {
     getJob(msg.jobId).then((job) => {
       sendResponse(job || null);
-      if (job && (job.status === 'done' || job.status === 'error')) {
-        deleteJob(msg.jobId);
-      }
     });
     return true; // Canal asíncrono para getJob
+  }
+  
+  if (msg.type === 'CLEAR_JOB') {
+    deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
+    return true;
   }
   
   if (msg.type === 'EXECUTE_UNSUBSCRIBE') {
