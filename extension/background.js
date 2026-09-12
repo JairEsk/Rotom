@@ -199,10 +199,29 @@
       return;
     }
     if (info.type === "mailto") {
-      const parsed = new URL(info.url);
-      const to = parsed.pathname;
-      const subject = parsed.searchParams.get("subject") || "unsubscribe";
-      const rawMsg = [`To: ${to}`, `Subject: ${subject}`, ``, ``].join("\r\n");
+      let parsed;
+      try {
+        parsed = new URL(info.url);
+      } catch {
+        throw new Error("Invalid mailto URL.");
+      }
+      let to = "";
+      try {
+        to = parsed.pathname ? decodeURIComponent(parsed.pathname) : "";
+      } catch {
+        throw new Error("Malformed URI encoding in mailto recipient.");
+      }
+      if (/[\x00-\x1f\x7f]/.test(to)) {
+        throw new Error("Invalid mailto recipient address.");
+      }
+      const cleanTo = to.trim();
+      const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+      if (!emailRegex.test(cleanTo)) {
+        throw new Error("Invalid mailto recipient address.");
+      }
+      const rawSubject = parsed.searchParams.get("subject") || "unsubscribe";
+      const cleanSubject = rawSubject.replace(/[\r\n\x00-\x1f\x7f]/g, "").trim().slice(0, 200) || "unsubscribe";
+      const rawMsg = [`To: ${cleanTo}`, `Subject: ${cleanSubject}`, "", ""].join("\r\n");
       const encoded = btoa(unescape(encodeURIComponent(rawMsg))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
       await gmailPost("messages/send", token, { raw: encoded });
     }
