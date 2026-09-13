@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatDate, isValidPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
+import { formatBytes, formatDate, escHtml, isValidPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
 
 describe('utils formatting', () => {
   it('formats bytes correctly', () => {
@@ -15,6 +15,15 @@ describe('utils formatting', () => {
 
     const yesterday = new Date(Date.now() - 86400000).toISOString();
     expect(formatDate(yesterday)).toBe('Yesterday');
+  });
+
+  it('escapes HTML special characters and quotes safely for elements and attributes', () => {
+    expect(escHtml('Normal text')).toBe('Normal text');
+    expect(escHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+    expect(escHtml('Foo & Bar "baz" \'qux\'')).toBe('Foo &amp; Bar &quot;baz&quot; &#39;qux&#39;');
+    expect(escHtml('attacker" onclick="evil()')).toBe('attacker&quot; onclick=&quot;evil()');
+    expect(escHtml(null)).toBe('');
+    expect(escHtml(undefined)).toBe('');
   });
 });
 

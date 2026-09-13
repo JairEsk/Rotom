@@ -24,10 +24,8 @@
     }
   }
   function escHtml(t) {
-    if (!t) return "";
-    const d = document.createElement("div");
-    d.textContent = t;
-    return d.innerHTML;
+    if (t === null || t === void 0) return "";
+    return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function parseUnsubscribeHeader(headers) {
     if (!Array.isArray(headers)) return null;
@@ -453,15 +451,16 @@
     const tr = document.createElement("tr");
     tr.dataset.id = email.id;
     const dateStr = email.date ? formatDate(email.date) : "";
-    const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
+    const safeId = encodeURIComponent(email.id || "");
+    const gmailLink = `https://mail.google.com/mail/u/0/#all/${safeId}`;
     if (email.unsubscribeInfo) tr.classList.add("has-unsub");
     tr.innerHTML = `
-    <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
+    <td><input type="checkbox" class="email-check" data-id="${escHtml(email.id)}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
     <td class="from-cell" title="${escHtml(email.from)}">
       <a href="#" class="sender-filter-link" title="Click to filter by this sender">${escHtml(email.from)}</a>
     </td>
     <td class="subject-cell" title="${escHtml(email.subject)}">
-      <a class="subject-link" href="${gmailLink}" target="_blank">${escHtml(email.subject) || "<em>no subject</em>"}</a>
+      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank">${escHtml(email.subject) || "<em>no subject</em>"}</a>
     </td>
     <td class="date-cell" title="${escHtml(email.date)}">${escHtml(dateStr)}</td>
     <td class="size-cell">${escHtml(email.readableSize)}</td>
@@ -601,7 +600,7 @@
     emails = emails.filter((email) => !idsSet.has(email.id));
     ids.forEach((id) => {
       selectedIds.delete(id);
-      document.querySelector(`tr[data-id="${id}"]`)?.remove();
+      document.querySelector(`tr[data-id="${CSS.escape(String(id))}"]`)?.remove();
     });
     if (emails.length === 0) {
       hideSection();
@@ -769,7 +768,7 @@
     }
   }
   function setRowUnsubState(emailId, state) {
-    const tr = document.querySelector(`tr[data-id="${emailId}"]`);
+    const tr = document.querySelector(`tr[data-id="${CSS.escape(String(emailId))}"]`);
     if (!tr) return;
     tr.dataset.unsubState = state;
     const btn = tr.querySelector(".unsub-btn");
