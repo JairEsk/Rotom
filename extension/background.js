@@ -49,6 +49,62 @@
     return res.json();
   }
 
+  // src/utils.js
+  function isValidPublicHttpsUrl(urlString) {
+    if (typeof urlString !== "string") return false;
+    let parsed;
+    try {
+      parsed = new URL(urlString);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    let hostname = parsed.hostname.toLowerCase();
+    if (!hostname) return false;
+    hostname = hostname.replace(/\.$/, "");
+    const reservedSuffixes = [
+      "localhost",
+      "local",
+      "internal",
+      "lan",
+      "home.arpa",
+      "test",
+      "example",
+      "invalid",
+      "onion",
+      "alt",
+      "nip.io",
+      "sslip.io",
+      "xip.io",
+      "localtest.me"
+    ];
+    if (reservedSuffixes.some((s) => hostname === s || hostname.endsWith("." + s))) {
+      return false;
+    }
+    if (hostname.startsWith("[") || hostname.includes(":")) {
+      return false;
+    }
+    const ipv4Match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(hostname);
+    if (ipv4Match) {
+      const octets = ipv4Match.slice(1, 5).map(Number);
+      if (octets.some((o) => o < 0 || o > 255)) return false;
+      const [o0, o1] = octets;
+      if (o0 === 0 || o0 === 10 || o0 === 127 || o0 >= 224) return false;
+      if (o0 === 169 && o1 === 254) return false;
+      if (o0 === 172 && o1 >= 16 && o1 <= 31) return false;
+      if (o0 === 192 && o1 === 168) return false;
+      if (o0 === 100 && o1 >= 64 && o1 <= 127) return false;
+      if (o0 === 192 && o1 === 0) return false;
+      if (o0 === 198 && (o1 === 18 || o1 === 19 || o1 === 51)) return false;
+      if (o0 === 203 && o1 === 0) return false;
+      return true;
+    }
+    if (!hostname.includes(".")) return false;
+    const domainRegex = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    return domainRegex.test(hostname);
+  }
+
   // src/background.js
   chrome.runtime.onInstalled.addListener(() => {
     console.log("R.O.T.O.M. installed.");
@@ -185,17 +241,27 @@
   async function executeUnsubscribe(email, token) {
     const info = email.unsubscribeInfo;
     if (!info) return;
-    if (info.type === "one-click" || info.type === "https") {
-      if (!info.url.startsWith("https://")) {
-        throw new Error("Unsubscribe URL is not HTTPS.");
+    if (info.type === "one-click") {
+      if (!isValidPublicHttpsUrl(info.url)) {
+        throw new Error("Invalid or non-public HTTPS unsubscribe URL.");
       }
       await fetch(info.url, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "List-Unsubscribe=One-Click",
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
         mode: "no-cors"
-        // Crucial: bypasses CORS blocks
+        // Crucial: bypasses CORS blocks in browser context
       });
+      return;
+    }
+    if (info.type === "https") {
+      if (!isValidPublicHttpsUrl(info.url)) {
+        throw new Error("Invalid or non-public HTTPS unsubscribe URL.");
+      }
+      await chrome.tabs.create({ url: info.url, active: false });
       return;
     }
     if (info.type === "mailto") {

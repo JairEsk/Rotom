@@ -1,4 +1,4 @@
-import { formatBytes, formatDate, escHtml } from "./utils.js";
+import { formatBytes, formatDate, escHtml, parseUnsubscribeHeader } from "./utils.js";
 import { gmailGet, gmailPost, gmailBatchGet, AuthError } from './api.js';
 
 // --- State ---
@@ -316,14 +316,6 @@ async function fetchMetadataBatch(msgs) {
   return batchRes.map(parseEmailItem);
 }
 
-async function fetchEmailItem(id) {
-  const msg = await gmailGet(`messages/${id}`, token, {
-    format: 'metadata',
-    metadataHeaders: ['Subject', 'From', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
-  });
-  return parseEmailItem(msg);
-}
-
 // --- Render ---
 function renderEmails() {
   const body = document.getElementById('email-body');
@@ -578,27 +570,6 @@ async function confirmEmptyTrash() {
   }
 }
 
-
-// --- Unsubscribe: parse List-Unsubscribe header ----------------------------
-function parseUnsubscribeHeader(headers) {
-  let rawValue = '';
-  let hasOneClick = false;
-  headers.forEach(header => {
-    const name = header.name.toLowerCase();
-    if (name === 'list-unsubscribe') rawValue = header.value;
-    if (name === 'list-unsubscribe-post' && header.value.includes('One-Click')) hasOneClick = true;
-  });
-  if (!rawValue) return null;
-
-  const urls = rawValue.match(/<([^>]+)>/g)?.map(m => m.slice(1, -1)) || [];
-  const httpsUrl = urls.find(u => u.startsWith('https://'));
-  const mailtoUrl = urls.find(u => u.startsWith('mailto:'));
-
-  if (httpsUrl && hasOneClick) return { type: 'one-click', url: httpsUrl };
-  if (httpsUrl) return { type: 'https', url: httpsUrl };
-  if (mailtoUrl) return { type: 'mailto', url: mailtoUrl };
-  return null;
-}
 
 // --- Unsubscribe: execute for a single email -------------------------------
 async function executeUnsubscribe(email) {

@@ -29,6 +29,31 @@
     d.textContent = t;
     return d.innerHTML;
   }
+  function parseUnsubscribeHeader(headers) {
+    if (!Array.isArray(headers)) return null;
+    let rawValue = "";
+    let hasOneClick = false;
+    headers.forEach((header) => {
+      if (!header || !header.name) return;
+      const name = header.name.toLowerCase();
+      if (name === "list-unsubscribe" && typeof header.value === "string") {
+        rawValue = header.value;
+      }
+      if (name === "list-unsubscribe-post" && typeof header.value === "string") {
+        if (/^\s*List-Unsubscribe\s*=\s*One-Click\s*$/i.test(header.value)) {
+          hasOneClick = true;
+        }
+      }
+    });
+    if (!rawValue) return null;
+    const urls = rawValue.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1)) || [];
+    const httpsUrl = urls.find((u) => u.startsWith("https://"));
+    const mailtoUrl = urls.find((u) => u.startsWith("mailto:"));
+    if (httpsUrl && hasOneClick) return { type: "one-click", url: httpsUrl };
+    if (mailtoUrl) return { type: "mailto", url: mailtoUrl };
+    if (httpsUrl) return { type: "https", url: httpsUrl };
+    return null;
+  }
 
   // src/api.js
   var GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -121,7 +146,7 @@
           try {
             const msg = JSON.parse(match[0]);
             if (msg.id) messages.push(msg);
-          } catch (e) {
+          } catch {
           }
         }
       }
@@ -649,23 +674,6 @@
       btn.disabled = false;
       btn.textContent = "Empty Trash";
     }
-  }
-  function parseUnsubscribeHeader(headers) {
-    let rawValue = "";
-    let hasOneClick = false;
-    headers.forEach((header) => {
-      const name = header.name.toLowerCase();
-      if (name === "list-unsubscribe") rawValue = header.value;
-      if (name === "list-unsubscribe-post" && header.value.includes("One-Click")) hasOneClick = true;
-    });
-    if (!rawValue) return null;
-    const urls = rawValue.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1)) || [];
-    const httpsUrl = urls.find((u) => u.startsWith("https://"));
-    const mailtoUrl = urls.find((u) => u.startsWith("mailto:"));
-    if (httpsUrl && hasOneClick) return { type: "one-click", url: httpsUrl };
-    if (httpsUrl) return { type: "https", url: httpsUrl };
-    if (mailtoUrl) return { type: "mailto", url: mailtoUrl };
-    return null;
   }
   async function executeUnsubscribe(email) {
     return new Promise((resolve, reject) => {

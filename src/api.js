@@ -88,7 +88,7 @@ export async function gmailBatchGet(ids, token) {
         try {
           const msg = JSON.parse(match[0]);
           if (msg.id) messages.push(msg);
-        } catch(e) {}
+        } catch {}
       }
     }
   });

@@ -1,4 +1,6 @@
+/* eslint-disable no-control-regex */
 import { gmailPost, gmailGet, AuthError } from './api.js';
+import { isValidPublicHttpsUrl } from './utils.js';
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('R.O.T.O.M. installed.');
@@ -146,22 +148,33 @@ async function runJob(jobId, action, payload) {
   }
 }
 
-// Unsubscribe bypassing CORS with mode: 'no-cors'
+// Execute Unsubscribe (RFC 8058 One-Click POST, HTTPS landing page, or mailto)
 async function executeUnsubscribe(email, token) {
   const info = email.unsubscribeInfo;
   if (!info) return;
 
-  if (info.type === 'one-click' || info.type === 'https') {
-    if (!info.url.startsWith('https://')) {
-      throw new Error('Unsubscribe URL is not HTTPS.');
+  if (info.type === 'one-click') {
+    if (!isValidPublicHttpsUrl(info.url)) {
+      throw new Error('Invalid or non-public HTTPS unsubscribe URL.');
     }
     await fetch(info.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'List-Unsubscribe=One-Click',
-      mode: 'no-cors' // Crucial: bypasses CORS blocks
+      credentials: 'omit',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+      mode: 'no-cors' // Crucial: bypasses CORS blocks in browser context
     });
     // With no-cors, response is opaque (status 0). We assume success if it didn't throw network error.
+    return;
+  }
+
+  if (info.type === 'https') {
+    if (!isValidPublicHttpsUrl(info.url)) {
+      throw new Error('Invalid or non-public HTTPS unsubscribe URL.');
+    }
+    await chrome.tabs.create({ url: info.url, active: false });
     return;
   }
 
