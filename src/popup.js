@@ -1,4 +1,4 @@
-import { formatBytes, formatDate, escHtml, parseUnsubscribeHeader } from "./utils.js";
+import { formatBytes, formatDate, escHtml, escapeCssValue, parseUnsubscribeHeader } from "./utils.js";
 import { gmailGet, gmailPost, gmailBatchGet, isValidMessageId, AuthError } from './api.js';
 
 // --- State ---
@@ -342,7 +342,7 @@ function appendEmailRow(body, email) {
   // Format date compactly
   const dateStr = email.date ? formatDate(email.date) : '';
   // Gmail web link for this message
-  const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
+  const gmailLink = `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.id)}`;
 
   if (email.unsubscribeInfo) tr.classList.add('has-unsub');
   tr.innerHTML = `
@@ -351,7 +351,7 @@ function appendEmailRow(body, email) {
       <a href="#" class="sender-filter-link" title="Click to filter by this sender"></a>
     </td>
     <td class="subject-cell">
-      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank"></a>
+      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank" rel="noopener noreferrer"></a>
     </td>
     <td class="date-cell"></td>
     <td class="size-cell"></td>
@@ -359,6 +359,7 @@ function appendEmailRow(body, email) {
       ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
     </td>
   `;
+  const checkEl = tr.querySelector('.email-check');
   const fromCell = tr.querySelector('.from-cell');
   const senderLink = tr.querySelector('.sender-filter-link');
   const subjectCell = tr.querySelector('.subject-cell');
@@ -366,6 +367,9 @@ function appendEmailRow(body, email) {
   const dateCell = tr.querySelector('.date-cell');
   const sizeCell = tr.querySelector('.size-cell');
 
+  checkEl.dataset.id = email.id;
+  subjectLink.href = gmailLink;
+  subjectLink.rel = 'noopener noreferrer';
   fromCell.title = email.from || '';
   senderLink.textContent = email.from || '';
   subjectCell.title = email.subject || '';
@@ -524,7 +528,7 @@ function removeFromList(ids) {
   emails = emails.filter(email => !idsSet.has(email.id));
   ids.forEach(id => {
     selectedIds.delete(id);
-    document.querySelector(`tr[data-id="${id}"]`)?.remove();
+    document.querySelector(`tr[data-id="${escapeCssValue(id)}"]`)?.remove();
   });
   if (emails.length === 0) {
     hideSection(); show('empty-state');
@@ -698,7 +702,7 @@ async function confirmBulkUnsubscribe() {
 
 // --- Unsubscribe: update row visual state ----------------------------------
 function setRowUnsubState(emailId, state) {
-  const tr = document.querySelector(`tr[data-id="${emailId}"]`);
+  const tr = document.querySelector(`tr[data-id="${escapeCssValue(emailId)}"]`);
   if (!tr) return;
   tr.dataset.unsubState = state;
   const btn = tr.querySelector('.unsub-btn');

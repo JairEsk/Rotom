@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatDate, escHtml, isPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
+import { formatBytes, formatDate, escHtml, escapeCssValue, isPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
 
 describe('utils', () => {
   it('formats bytes correctly', () => {
@@ -26,6 +26,16 @@ describe('utils', () => {
     expect(escHtml("O'Reilly & Associates <script>alert(1)</script>")).toBe(
       'O&#39;Reilly &amp; Associates &lt;script&gt;alert(1)&lt;/script&gt;'
     );
+  });
+
+  it('escapes CSS selector values safely', () => {
+    expect(escapeCssValue('abcDEF123')).toBe('abcDEF123');
+    expect(escapeCssValue('')).toBe('');
+    expect(escapeCssValue(null)).toBe('');
+    expect(escapeCssValue('id"with]quotes')).toBe('id\\"with\\]quotes');
+    expect(escapeCssValue('18f3a9b')).toBe('\\31 8f3a9b');
+    expect(escapeCssValue('-')).toBe('\\-');
+    expect(escapeCssValue('a\x00b')).toBe('a\uFFFDb');
   });
 
   it('validates public HTTPS URLs and rejects private, local, or malformed URLs', () => {
