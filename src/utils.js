@@ -28,7 +28,10 @@ export function formatDate(raw) {
 
 export function escHtml(t) {
   if (!t) return '';
-  const d = document.createElement('div');
-  d.textContent = t;
-  return d.innerHTML;
+  return String(t)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

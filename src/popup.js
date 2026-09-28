@@ -356,6 +356,22 @@ function appendEmailRow(body, email) {
       ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
     </td>
   `;
+  const fromCell = tr.querySelector('.from-cell');
+  const senderLink = tr.querySelector('.sender-filter-link');
+  const subjectCell = tr.querySelector('.subject-cell');
+  const subjectLink = tr.querySelector('.subject-link');
+  const dateCell = tr.querySelector('.date-cell');
+
+  fromCell.title = email.from || '';
+  senderLink.textContent = email.from || '';
+  subjectCell.title = email.subject || '';
+  if (email.subject) {
+    subjectLink.textContent = email.subject;
+  } else {
+    subjectLink.innerHTML = '<em>no subject</em>';
+  }
+  dateCell.title = email.date || '';
+  dateCell.textContent = dateStr;
   tr.querySelector('.email-check').addEventListener('change', e => {
     e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
     syncHeaderCheckbox();
