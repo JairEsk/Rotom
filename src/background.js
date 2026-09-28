@@ -1,4 +1,4 @@
-import { gmailPost, gmailGet, AuthError } from './api.js';
+import { gmailPost, gmailGet, isValidMessageId, AuthError } from './api.js';
 import { isPublicHttpsUrl } from './utils.js';
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
@@ -8,6 +8,57 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
 }
 
 const STALE_JOB_TIMEOUT_MS = 60000;
+const JOB_ACTIONS = new Set(['TRASH', 'DELETE_FOREVER', 'EMPTY_TRASH']);
+const JOB_ID_REGEX = /^\d{13}$/;
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasValidToken(payload) {
+  return typeof payload.token === 'string' && payload.token.length > 0;
+}
+
+function isHeaderControlCharacter(char) {
+  const code = char.charCodeAt(0);
+  return code <= 0x1f || code === 0x7f;
+}
+
+export function isTrustedRuntimeSender(sender, runtimeId) {
+  return typeof runtimeId === 'string' && runtimeId.length > 0 && sender?.id === runtimeId;
+}
+
+export function isValidRuntimeMessage(msg) {
+  if (!isRecord(msg) || typeof msg.type !== 'string') return false;
+
+  if (msg.type === 'START_JOB') {
+    if (!JOB_ACTIONS.has(msg.action) || !isRecord(msg.payload) || !hasValidToken(msg.payload)) {
+      return false;
+    }
+    if (msg.action === 'EMPTY_TRASH') return true;
+    return Array.isArray(msg.payload.ids) &&
+      msg.payload.ids.length > 0 &&
+      msg.payload.ids.every(isValidMessageId);
+  }
+
+  if (msg.type === 'GET_JOB_STATUS' || msg.type === 'CLEAR_JOB') {
+    return typeof msg.jobId === 'string' && JOB_ID_REGEX.test(msg.jobId);
+  }
+
+  if (msg.type === 'EXECUTE_UNSUBSCRIBE') {
+    const payload = msg.payload;
+    const info = payload?.email?.unsubscribeInfo;
+    return isRecord(payload) &&
+      hasValidToken(payload) &&
+      isRecord(payload.email) &&
+      isRecord(info) &&
+      (info.type === 'one-click' || info.type === 'mailto') &&
+      typeof info.url === 'string' &&
+      info.url.length > 0;
+  }
+
+  return false;
+}
 
 // Persist jobs in storage.session across transient service worker restarts
 async function getJob(jobId) {
@@ -31,6 +82,12 @@ async function deleteJob(jobId) {
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!isTrustedRuntimeSender(sender, chrome.runtime.id)) return false;
+    if (!isValidRuntimeMessage(msg)) {
+      sendResponse({ success: false, error: 'Invalid runtime message.' });
+      return false;
+    }
+
     if (msg.type === 'START_JOB') {
       const jobId = Date.now().toString();
       const initialJob = {
@@ -190,7 +247,7 @@ export async function executeUnsubscribe(email, token) {
       throw new Error('Malformed URI encoding in mailto recipient.');
     }
 
-    if (/[\x00-\x1f\x7f]/.test(to)) {
+    if ([...to].some(isHeaderControlCharacter)) {
       throw new Error('Invalid mailto recipient address.');
     }
 
@@ -201,7 +258,11 @@ export async function executeUnsubscribe(email, token) {
     }
 
     const rawSubject = parsed.searchParams.get('subject') || 'unsubscribe';
-    const cleanSubject = rawSubject.replace(/[\r\n\x00-\x1f\x7f]/g, '').trim().slice(0, 200) || 'unsubscribe';
+    const cleanSubject = [...rawSubject]
+      .filter(char => !isHeaderControlCharacter(char))
+      .join('')
+      .trim()
+      .slice(0, 200) || 'unsubscribe';
 
     const rawMsg = [`To: ${cleanTo}`, `Subject: ${cleanSubject}`, '', ''].join('\r\n');
     const encoded = btoa(unescape(encodeURIComponent(rawMsg)))

@@ -1,5 +1,75 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { executeUnsubscribe } from './background.js';
+import {
+  executeUnsubscribe,
+  isTrustedRuntimeSender,
+  isValidRuntimeMessage
+} from './background.js';
+
+describe('runtime message validation', () => {
+  const token = 'fake-token';
+  const email = {
+    unsubscribeInfo: {
+      type: 'one-click',
+      url: 'https://unsubscribe.newsletter.org/optout'
+    }
+  };
+
+  it('accepts only senders from the same extension', () => {
+    expect(isTrustedRuntimeSender({ id: 'extension-id' }, 'extension-id')).toBe(true);
+    expect(isTrustedRuntimeSender({ id: 'other-extension' }, 'extension-id')).toBe(false);
+    expect(isTrustedRuntimeSender({}, 'extension-id')).toBe(false);
+    expect(isTrustedRuntimeSender({ id: 'extension-id' }, undefined)).toBe(false);
+  });
+
+  it('accepts valid job, status, clear, and unsubscribe messages', () => {
+    expect(isValidRuntimeMessage({
+      type: 'START_JOB',
+      action: 'TRASH',
+      payload: { token, ids: ['18f3c2a9b01d4e5f'] }
+    })).toBe(true);
+    expect(isValidRuntimeMessage({
+      type: 'START_JOB',
+      action: 'DELETE_FOREVER',
+      payload: { token, ids: ['18f3c2a9b01d4e5f'] }
+    })).toBe(true);
+    expect(isValidRuntimeMessage({
+      type: 'START_JOB',
+      action: 'EMPTY_TRASH',
+      payload: { token }
+    })).toBe(true);
+    expect(isValidRuntimeMessage({ type: 'GET_JOB_STATUS', jobId: '1790606000000' })).toBe(true);
+    expect(isValidRuntimeMessage({ type: 'CLEAR_JOB', jobId: '1790606000000' })).toBe(true);
+    expect(isValidRuntimeMessage({
+      type: 'EXECUTE_UNSUBSCRIBE',
+      payload: { token, email }
+    })).toBe(true);
+  });
+
+  it('rejects unknown actions and malformed destructive payloads', () => {
+    const invalidMessages = [
+      null,
+      {},
+      { type: 'UNKNOWN' },
+      { type: 'START_JOB', action: 'DELETE_ALL', payload: { token, ids: ['18f3c2a9b01d4e5f'] } },
+      { type: 'START_JOB', action: 'TRASH', payload: { token, ids: [] } },
+      { type: 'START_JOB', action: 'TRASH', payload: { token, ids: ['../messages/123'] } },
+      { type: 'START_JOB', action: 'EMPTY_TRASH', payload: { token: '' } },
+      { type: 'GET_JOB_STATUS', jobId: '../filters' },
+      { type: 'CLEAR_JOB', jobId: '123' },
+      { type: 'EXECUTE_UNSUBSCRIBE', payload: { token, email: {} } },
+      {
+        type: 'EXECUTE_UNSUBSCRIBE',
+        payload: { token, email: { unsubscribeInfo: { type: 'https', url: email.unsubscribeInfo.url } } }
+      },
+      {
+        type: 'EXECUTE_UNSUBSCRIBE',
+        payload: { token, email: { unsubscribeInfo: { type: 'one-click', url: '' } } }
+      }
+    ];
+
+    invalidMessages.forEach(msg => expect(isValidRuntimeMessage(msg)).toBe(false));
+  });
+});
 
 describe('executeUnsubscribe', () => {
   let fetchMock;
