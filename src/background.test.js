@@ -45,6 +45,53 @@ describe('runtime message validation', () => {
     })).toBe(true);
   });
 
+  it('rejects untrusted senders and malformed messages before side effects', async () => {
+    let listener;
+    const storageSet = vi.fn();
+    const sendResponse = vi.fn();
+    vi.stubGlobal('chrome', {
+      runtime: {
+        id: 'extension-id',
+        onInstalled: { addListener: vi.fn() },
+        onMessage: { addListener: vi.fn(callback => { listener = callback; }) }
+      },
+      storage: {
+        session: {
+          get: vi.fn(),
+          set: storageSet,
+          remove: vi.fn()
+        }
+      }
+    });
+    vi.resetModules();
+
+    try {
+      await import('./background.js');
+
+      expect(listener(
+        { type: 'START_JOB', action: 'EMPTY_TRASH', payload: { token } },
+        { id: 'other-extension' },
+        sendResponse
+      )).toBe(false);
+      expect(sendResponse).not.toHaveBeenCalled();
+      expect(storageSet).not.toHaveBeenCalled();
+
+      expect(listener(
+        { type: 'START_JOB', action: 'EMPTY_TRASH', payload: { token: '' } },
+        { id: 'extension-id' },
+        sendResponse
+      )).toBe(false);
+      expect(sendResponse).toHaveBeenCalledWith({
+        success: false,
+        error: 'Invalid runtime message.'
+      });
+      expect(storageSet).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+      vi.resetModules();
+    }
+  });
+
   it('rejects unknown actions and malformed destructive payloads', () => {
     const invalidMessages = [
       null,

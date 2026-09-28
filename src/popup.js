@@ -17,6 +17,9 @@ async function startJob(action, payload) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({ type: 'START_JOB', action, payload }, (res) => {
       if (chrome.runtime.lastError) return reject(new Error(chrome.runtime.lastError.message));
+      if (!res || typeof res.jobId !== 'string') {
+        return reject(new Error(res?.error || 'Failed to start job'));
+      }
       resolve(res.jobId);
     });
   });
@@ -30,9 +33,10 @@ async function pollJob(jobId, onProgress) {
       inFlight = true;
       chrome.runtime.sendMessage({ type: 'GET_JOB_STATUS', jobId }, (job) => {
         inFlight = false;
-        if (!job) {
+        const runtimeError = chrome.runtime.lastError;
+        if (runtimeError || !job || job.success === false || typeof job.status !== 'string') {
           clearInterval(interval);
-          reject(new Error('Job not found'));
+          reject(new Error(job?.error || runtimeError?.message || 'Job not found'));
           return;
         }
         if (onProgress) onProgress(job);
