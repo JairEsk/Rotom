@@ -27,6 +27,36 @@
     if (t == null) return "";
     return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+  function escapeCssValue(value) {
+    const str = String(value ?? "");
+    if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+      return CSS.escape(str);
+    }
+    const length = str.length;
+    let result = "";
+    const firstCodeUnit = str.charCodeAt(0);
+    for (let index = 0; index < length; index++) {
+      const codeUnit = str.charCodeAt(index);
+      if (codeUnit === 0) {
+        result += "\uFFFD";
+        continue;
+      }
+      if (codeUnit >= 1 && codeUnit <= 31 || codeUnit === 127 || index === 0 && codeUnit >= 48 && codeUnit <= 57 || index === 1 && codeUnit >= 48 && codeUnit <= 57 && firstCodeUnit === 45) {
+        result += `\\${codeUnit.toString(16)} `;
+        continue;
+      }
+      if (index === 0 && length === 1 && codeUnit === 45) {
+        result += `\\${str.charAt(index)}`;
+        continue;
+      }
+      if (codeUnit >= 128 || codeUnit === 45 || codeUnit === 95 || codeUnit >= 48 && codeUnit <= 57 || codeUnit >= 65 && codeUnit <= 90 || codeUnit >= 97 && codeUnit <= 122) {
+        result += str.charAt(index);
+        continue;
+      }
+      result += `\\${str.charAt(index)}`;
+    }
+    return result;
+  }
   function isPublicIpv6(ipv6) {
     if (ipv6.includes("%")) return false;
     const parts = ipv6.split("::");
@@ -522,7 +552,7 @@
     const tr = document.createElement("tr");
     tr.dataset.id = email.id;
     const dateStr = email.date ? formatDate(email.date) : "";
-    const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
+    const gmailLink = `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.id)}`;
     if (email.unsubscribeInfo) tr.classList.add("has-unsub");
     tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${escHtml(email.id)}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
@@ -530,7 +560,7 @@
       <a href="#" class="sender-filter-link" title="Click to filter by this sender"></a>
     </td>
     <td class="subject-cell">
-      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank"></a>
+      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank" rel="noopener noreferrer"></a>
     </td>
     <td class="date-cell"></td>
     <td class="size-cell"></td>
@@ -538,12 +568,16 @@
       ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ""}
     </td>
   `;
+    const checkEl = tr.querySelector(".email-check");
     const fromCell = tr.querySelector(".from-cell");
     const senderLink = tr.querySelector(".sender-filter-link");
     const subjectCell = tr.querySelector(".subject-cell");
     const subjectLink = tr.querySelector(".subject-link");
     const dateCell = tr.querySelector(".date-cell");
     const sizeCell = tr.querySelector(".size-cell");
+    checkEl.dataset.id = email.id;
+    subjectLink.href = gmailLink;
+    subjectLink.rel = "noopener noreferrer";
     fromCell.title = email.from || "";
     senderLink.textContent = email.from || "";
     subjectCell.title = email.subject || "";
@@ -687,7 +721,7 @@
     emails = emails.filter((email) => !idsSet.has(email.id));
     ids.forEach((id) => {
       selectedIds.delete(id);
-      document.querySelector(`tr[data-id="${id}"]`)?.remove();
+      document.querySelector(`tr[data-id="${escapeCssValue(id)}"]`)?.remove();
     });
     if (emails.length === 0) {
       hideSection();
@@ -855,7 +889,7 @@
     }
   }
   function setRowUnsubState(emailId, state) {
-    const tr = document.querySelector(`tr[data-id="${emailId}"]`);
+    const tr = document.querySelector(`tr[data-id="${escapeCssValue(emailId)}"]`);
     if (!tr) return;
     tr.dataset.unsubState = state;
     const btn = tr.querySelector(".unsub-btn");
