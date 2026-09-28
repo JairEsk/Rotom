@@ -1,5 +1,5 @@
 import { formatBytes, formatDate, escHtml, parseUnsubscribeHeader } from "./utils.js";
-import { gmailGet, gmailPost, gmailBatchGet, AuthError } from './api.js';
+import { gmailGet, gmailPost, gmailBatchGet, isValidMessageId, AuthError } from './api.js';
 
 // --- State ---
 let token         = null;
@@ -310,14 +310,17 @@ function parseEmailItem(msg) {
 }
 
 async function fetchMetadataBatch(msgs) {
-  const ids = msgs.map(m => m.id);
+  const ids = msgs.map(m => m?.id).filter(isValidMessageId);
   // We can do them all in a single batch request!
   const batchRes = await gmailBatchGet(ids, token);
   return batchRes.map(parseEmailItem);
 }
 
 async function fetchEmailItem(id) {
-  const msg = await gmailGet(`messages/${id}`, token, {
+  if (!isValidMessageId(id)) {
+    throw new Error('Invalid Gmail message ID.');
+  }
+  const msg = await gmailGet(`messages/${encodeURIComponent(id)}`, token, {
     format: 'metadata',
     metadataHeaders: ['Subject', 'From', 'Date', 'List-Unsubscribe', 'List-Unsubscribe-Post']
   });

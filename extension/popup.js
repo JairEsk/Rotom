@@ -118,11 +118,15 @@
 
   // src/api.js
   var GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
+  var MESSAGE_ID_REGEX = /^[a-zA-Z0-9]+$/;
   var AuthError = class extends Error {
     constructor() {
       super("auth");
     }
   };
+  function isValidMessageId(id) {
+    return typeof id === "string" && MESSAGE_ID_REGEX.test(id);
+  }
   async function fetchWithBackoff(url, options, retries = 4, delay = 1e3) {
     for (let i = 0; i < retries; i++) {
       const res = await fetch(url, options);
@@ -166,10 +170,14 @@
     return res.json();
   }
   async function gmailBatchGet(ids, token2) {
-    if (ids.length === 0) return [];
+    if (!Array.isArray(ids) || ids.length === 0) return [];
     const boundary = "batch_gmail_req_boundary";
     let body = "";
     ids.forEach((id, index) => {
+      if (!isValidMessageId(id)) {
+        throw new Error("Invalid Gmail message ID.");
+      }
+      const safeId = encodeURIComponent(id);
       body += `--${boundary}\r
 `;
       body += `Content-Type: application/http\r
@@ -177,7 +185,7 @@
       body += `Content-ID: <item-${index}>\r
 \r
 `;
-      body += `GET /gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post HTTP/1.1\r
+      body += `GET /gmail/v1/users/me/messages/${safeId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post HTTP/1.1\r
 \r
 `;
     });
@@ -206,7 +214,7 @@
         if (match) {
           try {
             const msg = JSON.parse(match[0]);
-            if (msg.id) messages.push(msg);
+            if (isValidMessageId(msg?.id)) messages.push(msg);
           } catch (e) {
           }
         }
@@ -500,7 +508,7 @@
     return { id: msg.id, subject, from: sender, date, estimatedSize: size, readableSize: formatBytes(size), unsubscribeInfo };
   }
   async function fetchMetadataBatch(msgs) {
-    const ids = msgs.map((m) => m.id);
+    const ids = msgs.map((m) => m?.id).filter(isValidMessageId);
     const batchRes = await gmailBatchGet(ids, token);
     return batchRes.map(parseEmailItem);
   }
