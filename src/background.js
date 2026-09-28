@@ -1,8 +1,11 @@
 import { gmailPost, gmailGet, AuthError } from './api.js';
+import { isPublicHttpsUrl } from './utils.js';
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('R.O.T.O.M. installed.');
-});
+if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
+  chrome.runtime.onInstalled.addListener(() => {
+    console.log('R.O.T.O.M. installed.');
+  });
+}
 
 const STALE_JOB_TIMEOUT_MS = 60000;
 
@@ -26,44 +29,46 @@ async function deleteJob(jobId) {
   await chrome.storage.session.remove(jobId);
 }
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type === 'START_JOB') {
-    const jobId = Date.now().toString();
-    const initialJob = {
-      status: 'running',
-      processed: 0,
-      total: msg.payload.ids?.length || 0,
-      failed: 0,
-      updatedAt: Date.now()
-    };
+if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === 'START_JOB') {
+      const jobId = Date.now().toString();
+      const initialJob = {
+        status: 'running',
+        processed: 0,
+        total: msg.payload.ids?.length || 0,
+        failed: 0,
+        updatedAt: Date.now()
+      };
 
-    saveJob(jobId, initialJob).then(() => {
-      sendResponse({ jobId });
-      runJob(jobId, msg.action, msg.payload);
-    });
+      saveJob(jobId, initialJob).then(() => {
+        sendResponse({ jobId });
+        runJob(jobId, msg.action, msg.payload);
+      });
 
-    return true; // Keep message channel open for async saveJob
-  }
-  
-  if (msg.type === 'GET_JOB_STATUS') {
-    getJob(msg.jobId).then((job) => {
-      sendResponse(job || null);
-    });
-    return true; // Keep message channel open for async getJob
-  }
-  
-  if (msg.type === 'CLEAR_JOB') {
-    deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
-    return true;
-  }
-  
-  if (msg.type === 'EXECUTE_UNSUBSCRIBE') {
-    executeUnsubscribe(msg.payload.email, msg.payload.token)
-      .then(() => sendResponse({ success: true }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true;
-  }
-});
+      return true; // Keep message channel open for async saveJob
+    }
+    
+    if (msg.type === 'GET_JOB_STATUS') {
+      getJob(msg.jobId).then((job) => {
+        sendResponse(job || null);
+      });
+      return true; // Keep message channel open for async getJob
+    }
+    
+    if (msg.type === 'CLEAR_JOB') {
+      deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
+      return true;
+    }
+    
+    if (msg.type === 'EXECUTE_UNSUBSCRIBE') {
+      executeUnsubscribe(msg.payload.email, msg.payload.token)
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+    }
+  });
+}
 
 async function processInBatches(ids, jobId, processChunk, succeededOut = []) {
   const job = await getJob(jobId);
@@ -147,19 +152,24 @@ async function runJob(jobId, action, payload) {
 }
 
 // Unsubscribe bypassing CORS with mode: 'no-cors'
-async function executeUnsubscribe(email, token) {
-  const info = email.unsubscribeInfo;
-  if (!info) return;
+export async function executeUnsubscribe(email, token) {
+  const info = email?.unsubscribeInfo;
+  if (!info || typeof info !== 'object') {
+    throw new Error('Missing unsubscribe information.');
+  }
 
-  if (info.type === 'one-click' || info.type === 'https') {
-    if (!info.url.startsWith('https://')) {
-      throw new Error('Unsubscribe URL is not HTTPS.');
+  if (info.type === 'one-click') {
+    if (!isPublicHttpsUrl(info.url)) {
+      throw new Error('Unsubscribe URL must be a valid public HTTPS URL.');
     }
-    await fetch(info.url, {
+    const parsedUrl = new URL(info.url);
+    await fetch(parsedUrl.href, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'List-Unsubscribe=One-Click',
-      mode: 'no-cors' // Crucial: bypasses CORS blocks
+      mode: 'no-cors', // Crucial: bypasses CORS blocks
+      credentials: 'omit',
+      redirect: 'error'
     });
     // With no-cors, response is opaque (status 0). We assume success if it didn't throw network error.
     return;
@@ -197,5 +207,8 @@ async function executeUnsubscribe(email, token) {
     const encoded = btoa(unescape(encodeURIComponent(rawMsg)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     await gmailPost('messages/send', token, { raw: encoded });
+    return;
   }
+
+  throw new Error('Unsupported unsubscribe method.');
 }
