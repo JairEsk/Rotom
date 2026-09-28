@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatBytes, formatDate, escHtml, escapeCssValue, isPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
+import { formatBytes, formatDate, escHtml, escapeCssValue, buildSenderQuery, isPublicHttpsUrl, parseUnsubscribeHeader } from './utils.js';
 
 describe('utils', () => {
   it('formats bytes correctly', () => {
@@ -36,6 +36,22 @@ describe('utils', () => {
     expect(escapeCssValue('18f3a9b')).toBe('\\31 8f3a9b');
     expect(escapeCssValue('-')).toBe('\\-');
     expect(escapeCssValue('a\x00b')).toBe('a\uFFFDb');
+  });
+
+  it('quotes and sanitizes Gmail sender filters', () => {
+    expect(buildSenderQuery('')).toBe('');
+    expect(buildSenderQuery(null)).toBe('');
+    expect(buildSenderQuery('news@example.com')).toBe('from:"news@example.com"');
+    expect(buildSenderQuery('  amazon.com  ')).toBe('from:"amazon.com"');
+    expect(buildSenderQuery('attacker@example.com OR in:inbox')).toBe(
+      'from:"attacker@example.com OR in:inbox"'
+    );
+    expect(buildSenderQuery('evil" OR in:trash')).toBe('from:"evil OR in:trash"');
+    expect(buildSenderQuery('evil\\" OR in:spam')).toBe('from:"evil OR in:spam"');
+    expect(buildSenderQuery('evil\r\nOR in:anywhere')).toBe('from:"evil OR in:anywhere"');
+    expect(buildSenderQuery(`evil${String.fromCharCode(0x85)}OR in:sent`)).toBe(
+      'from:"evil OR in:sent"'
+    );
   });
 
   it('validates public HTTPS URLs and rejects private, local, or malformed URLs', () => {

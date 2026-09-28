@@ -57,6 +57,17 @@
     }
     return result;
   }
+  function buildSenderQuery(value) {
+    if (typeof value !== "string") return "";
+    let sanitized = "";
+    for (const char of value) {
+      const code = char.charCodeAt(0);
+      if (char === '"' || char === "\\") continue;
+      sanitized += code <= 31 || code >= 127 && code <= 159 ? " " : char;
+    }
+    const sender = sanitized.replace(/\s+/g, " ").trim();
+    return sender ? `from:"${sender}"` : "";
+  }
   function isPublicIpv6(ipv6) {
     if (ipv6.includes("%")) return false;
     const parts = ipv6.split("::");
@@ -455,12 +466,12 @@
     const size = document.getElementById("size-filter").value;
     const category = document.getElementById("category-filter").value;
     const date = document.getElementById("date-filter").value;
-    const sender = document.getElementById("sender-filter").value.trim();
+    const sender = buildSenderQuery(document.getElementById("sender-filter").value);
     const parts = [];
     if (size) parts.push(`larger:${size}M`);
     if (category) parts.push(category);
     if (date) parts.push(date);
-    if (sender) parts.push(`from:${sender}`);
+    if (sender) parts.push(sender);
     return parts.join(" ");
   }
   async function scanEmails() {

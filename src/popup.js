@@ -1,4 +1,4 @@
-import { formatBytes, formatDate, escHtml, escapeCssValue, parseUnsubscribeHeader } from "./utils.js";
+import { formatBytes, formatDate, escHtml, escapeCssValue, buildSenderQuery, parseUnsubscribeHeader } from "./utils.js";
 import { gmailGet, gmailPost, gmailBatchGet, isValidMessageId, AuthError } from './api.js';
 
 // --- State ---
@@ -216,12 +216,12 @@ function buildQuery() {
   const size     = document.getElementById('size-filter').value;
   const category = document.getElementById('category-filter').value;
   const date     = document.getElementById('date-filter').value;
-  const sender   = document.getElementById('sender-filter').value.trim();
+  const sender   = buildSenderQuery(document.getElementById('sender-filter').value);
   const parts    = [];
   if (size)     parts.push(`larger:${size}M`);
   if (category) parts.push(category);
   if (date)     parts.push(date);
-  if (sender)   parts.push(`from:${sender}`);
+  if (sender)   parts.push(sender);
   return parts.join(' ');
 }
 
