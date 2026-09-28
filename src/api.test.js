@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { gmailBatchGet, isValidMessageId } from './api.js';
+import { gmailBatchGet, isValidMessageId, revokeOAuthToken } from './api.js';
 
 describe('api message ID validation', () => {
   let fetchMock;
@@ -29,6 +29,33 @@ describe('api message ID validation', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('revokes OAuth tokens without exposing them in the URL', async () => {
+    const token = 'secret+token/with=value';
+    await revokeOAuthToken(token);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://oauth2.googleapis.com/revoke');
+    expect(url).not.toContain(token);
+    expect(options).toEqual({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'token=secret%2Btoken%2Fwith%3Dvalue',
+      credentials: 'omit',
+      redirect: 'error'
+    });
+  });
+
+  it('ignores empty OAuth tokens and rejects failed revocations', async () => {
+    await revokeOAuthToken('');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 400 });
+    await expect(revokeOAuthToken('expired-token')).rejects.toThrow(
+      'OAuth revocation failed: 400'
+    );
   });
 
   it('validates alphanumeric Gmail message IDs and rejects malformed values', () => {
