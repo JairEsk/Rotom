@@ -1,6 +1,11 @@
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
+const MESSAGE_ID_REGEX = /^[a-zA-Z0-9]+$/;
 
 export class AuthError extends Error { constructor() { super('auth'); } }
+
+export function isValidMessageId(id) {
+  return typeof id === 'string' && MESSAGE_ID_REGEX.test(id);
+}
 
 export async function fetchWithBackoff(url, options, retries = 4, delay = 1000) {
   for (let i = 0; i < retries; i++) {
@@ -50,14 +55,18 @@ export async function gmailDelete(path, token) {
 }
 
 export async function gmailBatchGet(ids, token) {
-  if (ids.length === 0) return [];
+  if (!Array.isArray(ids) || ids.length === 0) return [];
   const boundary = 'batch_gmail_req_boundary';
   let body = '';
   ids.forEach((id, index) => {
+    if (!isValidMessageId(id)) {
+      throw new Error('Invalid Gmail message ID.');
+    }
+    const safeId = encodeURIComponent(id);
     body += `--${boundary}\r\n`;
     body += `Content-Type: application/http\r\n`;
     body += `Content-ID: <item-${index}>\r\n\r\n`;
-    body += `GET /gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post HTTP/1.1\r\n\r\n`;
+    body += `GET /gmail/v1/users/me/messages/${safeId}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=List-Unsubscribe&metadataHeaders=List-Unsubscribe-Post HTTP/1.1\r\n\r\n`;
   });
   body += `--${boundary}--\r\n`;
 
@@ -87,7 +96,7 @@ export async function gmailBatchGet(ids, token) {
       if (match) {
         try {
           const msg = JSON.parse(match[0]);
-          if (msg.id) messages.push(msg);
+          if (isValidMessageId(msg?.id)) messages.push(msg);
         } catch(e) {}
       }
     }
