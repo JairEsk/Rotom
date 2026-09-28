@@ -35,3 +35,110 @@ export function escHtml(t) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+function isPublicIpv6(ipv6) {
+  if (ipv6.includes('%')) return false;
+  const parts = ipv6.split('::');
+  if (parts.length > 2) return false;
+  const left = parts[0] ? parts[0].split(':') : [];
+  const right = parts.length === 2 && parts[1] ? parts[1].split(':') : [];
+  const missing = 8 - (left.length + right.length);
+  if ((parts.length === 1 && missing !== 0) || (parts.length === 2 && missing < 1)) {
+    return false;
+  }
+  const full = [...left, ...Array(missing).fill('0'), ...right];
+  if (full.length !== 8) return false;
+  const groups = full.map(g => (/^[0-9a-f]{1,4}$/i.test(g) ? parseInt(g, 16) : NaN));
+  if (groups.some(Number.isNaN)) return false;
+
+  const [g0, g1] = groups;
+  // Only IANA Global Unicast (2000::/3) is routable on the public Internet
+  if ((g0 & 0xe000) !== 0x2000) return false;
+  // Exclude 2001:0000::/32 (Teredo), 2001:0002::/48 (Benchmarking), 2001:0010::/28 (ORCHID), 2001:0db8::/32 (Documentation)
+  if (g0 === 0x2001 && (g1 === 0x0000 || g1 === 0x0002 || (g1 >= 0x0010 && g1 <= 0x002f) || g1 === 0x0db8)) {
+    return false;
+  }
+  // Exclude 2002::/16 (6to4, which can embed private/loopback IPv4 addresses)
+  if (g0 === 0x2002) return false;
+
+  return true;
+}
+
+export function isPublicHttpsUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return false;
+  for (let i = 0; i < rawUrl.length; i++) {
+    const code = rawUrl.charCodeAt(i);
+    if (code <= 0x20 || code === 0x7f) return false;
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== 'https:') return false;
+  if (parsed.username || parsed.password) return false;
+
+  const host = parsed.hostname.toLowerCase();
+  if (!host) return false;
+
+  if (host.startsWith('[') && host.endsWith(']')) {
+    return isPublicIpv6(host.slice(1, -1));
+  }
+
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+    const octets = host.split('.').map(Number);
+    if (octets.some(o => o < 0 || o > 255)) return false;
+    const [a, b, c] = octets;
+    if (a === 0) return false;
+    if (a === 10) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false;
+    if (a === 127) return false;
+    if (a === 169 && b === 254) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return false;
+    if (a === 192 && b === 88 && c === 99) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 198 && (b === 18 || b === 19)) return false;
+    if (a === 198 && b === 51 && c === 100) return false;
+    if (a === 203 && b === 0 && c === 113) return false;
+    if (a >= 224) return false;
+    return true;
+  }
+
+  if (!host.includes('.') || host.startsWith('.') || host.endsWith('.') || host.includes('..')) {
+    return false;
+  }
+
+  const reservedTlds = /\.(localhost|local|internal|intranet|corp|home|lan|localdomain|invalid|test|example|onion)$/i;
+  if (reservedTlds.test(host)) return false;
+
+  const tld = host.split('.').pop();
+  if (!tld || /^\d+$/.test(tld)) return false;
+
+  return true;
+}
+
+export function parseUnsubscribeHeader(headers) {
+  if (!Array.isArray(headers)) return null;
+  let rawValue = '';
+  let hasOneClick = false;
+  headers.forEach(header => {
+    const name = (header?.name || '').toLowerCase();
+    if (name === 'list-unsubscribe') rawValue = header.value || '';
+    if (name === 'list-unsubscribe-post' && /list-unsubscribe\s*=\s*one-click/i.test(header.value || '')) {
+      hasOneClick = true;
+    }
+  });
+  if (!rawValue) return null;
+
+  const urls = rawValue.match(/<([^>]+)>/g)?.map(m => m.slice(1, -1).trim()) || [];
+  const httpsUrl = urls.find(u => isPublicHttpsUrl(u));
+  const mailtoUrl = urls.find(u => u.startsWith('mailto:'));
+
+  if (httpsUrl && hasOneClick) return { type: 'one-click', url: httpsUrl };
+  if (mailtoUrl) return { type: 'mailto', url: mailtoUrl };
+  return null;
+}

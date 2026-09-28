@@ -49,10 +49,83 @@
     return res.json();
   }
 
+  // src/utils.js
+  function isPublicIpv6(ipv6) {
+    if (ipv6.includes("%")) return false;
+    const parts = ipv6.split("::");
+    if (parts.length > 2) return false;
+    const left = parts[0] ? parts[0].split(":") : [];
+    const right = parts.length === 2 && parts[1] ? parts[1].split(":") : [];
+    const missing = 8 - (left.length + right.length);
+    if (parts.length === 1 && missing !== 0 || parts.length === 2 && missing < 1) {
+      return false;
+    }
+    const full = [...left, ...Array(missing).fill("0"), ...right];
+    if (full.length !== 8) return false;
+    const groups = full.map((g) => /^[0-9a-f]{1,4}$/i.test(g) ? parseInt(g, 16) : NaN);
+    if (groups.some(Number.isNaN)) return false;
+    const [g0, g1] = groups;
+    if ((g0 & 57344) !== 8192) return false;
+    if (g0 === 8193 && (g1 === 0 || g1 === 2 || g1 >= 16 && g1 <= 47 || g1 === 3512)) {
+      return false;
+    }
+    if (g0 === 8194) return false;
+    return true;
+  }
+  function isPublicHttpsUrl(rawUrl) {
+    if (typeof rawUrl !== "string" || !rawUrl.trim()) return false;
+    for (let i = 0; i < rawUrl.length; i++) {
+      const code = rawUrl.charCodeAt(i);
+      if (code <= 32 || code === 127) return false;
+    }
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host) return false;
+    if (host.startsWith("[") && host.endsWith("]")) {
+      return isPublicIpv6(host.slice(1, -1));
+    }
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      const octets = host.split(".").map(Number);
+      if (octets.some((o) => o < 0 || o > 255)) return false;
+      const [a, b, c] = octets;
+      if (a === 0) return false;
+      if (a === 10) return false;
+      if (a === 100 && b >= 64 && b <= 127) return false;
+      if (a === 127) return false;
+      if (a === 169 && b === 254) return false;
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      if (a === 192 && b === 0 && (c === 0 || c === 2)) return false;
+      if (a === 192 && b === 88 && c === 99) return false;
+      if (a === 192 && b === 168) return false;
+      if (a === 198 && (b === 18 || b === 19)) return false;
+      if (a === 198 && b === 51 && c === 100) return false;
+      if (a === 203 && b === 0 && c === 113) return false;
+      if (a >= 224) return false;
+      return true;
+    }
+    if (!host.includes(".") || host.startsWith(".") || host.endsWith(".") || host.includes("..")) {
+      return false;
+    }
+    const reservedTlds = /\.(localhost|local|internal|intranet|corp|home|lan|localdomain|invalid|test|example|onion)$/i;
+    if (reservedTlds.test(host)) return false;
+    const tld = host.split(".").pop();
+    if (!tld || /^\d+$/.test(tld)) return false;
+    return true;
+  }
+
   // src/background.js
-  chrome.runtime.onInstalled.addListener(() => {
-    console.log("R.O.T.O.M. installed.");
-  });
+  if (typeof chrome !== "undefined" && chrome.runtime?.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => {
+      console.log("R.O.T.O.M. installed.");
+    });
+  }
   var STALE_JOB_TIMEOUT_MS = 6e4;
   async function getJob(jobId) {
     const data = await chrome.storage.session.get(jobId);
@@ -70,37 +143,39 @@
   async function deleteJob(jobId) {
     await chrome.storage.session.remove(jobId);
   }
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (msg.type === "START_JOB") {
-      const jobId = Date.now().toString();
-      const initialJob = {
-        status: "running",
-        processed: 0,
-        total: msg.payload.ids?.length || 0,
-        failed: 0,
-        updatedAt: Date.now()
-      };
-      saveJob(jobId, initialJob).then(() => {
-        sendResponse({ jobId });
-        runJob(jobId, msg.action, msg.payload);
-      });
-      return true;
-    }
-    if (msg.type === "GET_JOB_STATUS") {
-      getJob(msg.jobId).then((job) => {
-        sendResponse(job || null);
-      });
-      return true;
-    }
-    if (msg.type === "CLEAR_JOB") {
-      deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
-      return true;
-    }
-    if (msg.type === "EXECUTE_UNSUBSCRIBE") {
-      executeUnsubscribe(msg.payload.email, msg.payload.token).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
-      return true;
-    }
-  });
+  if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg.type === "START_JOB") {
+        const jobId = Date.now().toString();
+        const initialJob = {
+          status: "running",
+          processed: 0,
+          total: msg.payload.ids?.length || 0,
+          failed: 0,
+          updatedAt: Date.now()
+        };
+        saveJob(jobId, initialJob).then(() => {
+          sendResponse({ jobId });
+          runJob(jobId, msg.action, msg.payload);
+        });
+        return true;
+      }
+      if (msg.type === "GET_JOB_STATUS") {
+        getJob(msg.jobId).then((job) => {
+          sendResponse(job || null);
+        });
+        return true;
+      }
+      if (msg.type === "CLEAR_JOB") {
+        deleteJob(msg.jobId).then(() => sendResponse({ success: true }));
+        return true;
+      }
+      if (msg.type === "EXECUTE_UNSUBSCRIBE") {
+        executeUnsubscribe(msg.payload.email, msg.payload.token).then(() => sendResponse({ success: true })).catch((err) => sendResponse({ success: false, error: err.message }));
+        return true;
+      }
+    });
+  }
   async function processInBatches(ids, jobId, processChunk, succeededOut = []) {
     const job = await getJob(jobId);
     if (!job) return succeededOut;
@@ -183,18 +258,23 @@
     }
   }
   async function executeUnsubscribe(email, token) {
-    const info = email.unsubscribeInfo;
-    if (!info) return;
-    if (info.type === "one-click" || info.type === "https") {
-      if (!info.url.startsWith("https://")) {
-        throw new Error("Unsubscribe URL is not HTTPS.");
+    const info = email?.unsubscribeInfo;
+    if (!info || typeof info !== "object") {
+      throw new Error("Missing unsubscribe information.");
+    }
+    if (info.type === "one-click") {
+      if (!isPublicHttpsUrl(info.url)) {
+        throw new Error("Unsubscribe URL must be a valid public HTTPS URL.");
       }
-      await fetch(info.url, {
+      const parsedUrl = new URL(info.url);
+      await fetch(parsedUrl.href, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: "List-Unsubscribe=One-Click",
-        mode: "no-cors"
+        mode: "no-cors",
         // Crucial: bypasses CORS blocks
+        credentials: "omit",
+        redirect: "error"
       });
       return;
     }
@@ -224,6 +304,8 @@
       const rawMsg = [`To: ${cleanTo}`, `Subject: ${cleanSubject}`, "", ""].join("\r\n");
       const encoded = btoa(unescape(encodeURIComponent(rawMsg))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
       await gmailPost("messages/send", token, { raw: encoded });
+      return;
     }
+    throw new Error("Unsupported unsubscribe method.");
   }
 })();

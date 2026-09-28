@@ -27,6 +27,94 @@
     if (t == null) return "";
     return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+  function isPublicIpv6(ipv6) {
+    if (ipv6.includes("%")) return false;
+    const parts = ipv6.split("::");
+    if (parts.length > 2) return false;
+    const left = parts[0] ? parts[0].split(":") : [];
+    const right = parts.length === 2 && parts[1] ? parts[1].split(":") : [];
+    const missing = 8 - (left.length + right.length);
+    if (parts.length === 1 && missing !== 0 || parts.length === 2 && missing < 1) {
+      return false;
+    }
+    const full = [...left, ...Array(missing).fill("0"), ...right];
+    if (full.length !== 8) return false;
+    const groups = full.map((g) => /^[0-9a-f]{1,4}$/i.test(g) ? parseInt(g, 16) : NaN);
+    if (groups.some(Number.isNaN)) return false;
+    const [g0, g1] = groups;
+    if ((g0 & 57344) !== 8192) return false;
+    if (g0 === 8193 && (g1 === 0 || g1 === 2 || g1 >= 16 && g1 <= 47 || g1 === 3512)) {
+      return false;
+    }
+    if (g0 === 8194) return false;
+    return true;
+  }
+  function isPublicHttpsUrl(rawUrl) {
+    if (typeof rawUrl !== "string" || !rawUrl.trim()) return false;
+    for (let i = 0; i < rawUrl.length; i++) {
+      const code = rawUrl.charCodeAt(i);
+      if (code <= 32 || code === 127) return false;
+    }
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "https:") return false;
+    if (parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host) return false;
+    if (host.startsWith("[") && host.endsWith("]")) {
+      return isPublicIpv6(host.slice(1, -1));
+    }
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      const octets = host.split(".").map(Number);
+      if (octets.some((o) => o < 0 || o > 255)) return false;
+      const [a, b, c] = octets;
+      if (a === 0) return false;
+      if (a === 10) return false;
+      if (a === 100 && b >= 64 && b <= 127) return false;
+      if (a === 127) return false;
+      if (a === 169 && b === 254) return false;
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      if (a === 192 && b === 0 && (c === 0 || c === 2)) return false;
+      if (a === 192 && b === 88 && c === 99) return false;
+      if (a === 192 && b === 168) return false;
+      if (a === 198 && (b === 18 || b === 19)) return false;
+      if (a === 198 && b === 51 && c === 100) return false;
+      if (a === 203 && b === 0 && c === 113) return false;
+      if (a >= 224) return false;
+      return true;
+    }
+    if (!host.includes(".") || host.startsWith(".") || host.endsWith(".") || host.includes("..")) {
+      return false;
+    }
+    const reservedTlds = /\.(localhost|local|internal|intranet|corp|home|lan|localdomain|invalid|test|example|onion)$/i;
+    if (reservedTlds.test(host)) return false;
+    const tld = host.split(".").pop();
+    if (!tld || /^\d+$/.test(tld)) return false;
+    return true;
+  }
+  function parseUnsubscribeHeader(headers) {
+    if (!Array.isArray(headers)) return null;
+    let rawValue = "";
+    let hasOneClick = false;
+    headers.forEach((header) => {
+      const name = (header?.name || "").toLowerCase();
+      if (name === "list-unsubscribe") rawValue = header.value || "";
+      if (name === "list-unsubscribe-post" && /list-unsubscribe\s*=\s*one-click/i.test(header.value || "")) {
+        hasOneClick = true;
+      }
+    });
+    if (!rawValue) return null;
+    const urls = rawValue.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1).trim()) || [];
+    const httpsUrl = urls.find((u) => isPublicHttpsUrl(u));
+    const mailtoUrl = urls.find((u) => u.startsWith("mailto:"));
+    if (httpsUrl && hasOneClick) return { type: "one-click", url: httpsUrl };
+    if (mailtoUrl) return { type: "mailto", url: mailtoUrl };
+    return null;
+  }
 
   // src/api.js
   var GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -664,23 +752,6 @@
       btn.disabled = false;
       btn.textContent = "Empty Trash";
     }
-  }
-  function parseUnsubscribeHeader(headers) {
-    let rawValue = "";
-    let hasOneClick = false;
-    headers.forEach((header) => {
-      const name = header.name.toLowerCase();
-      if (name === "list-unsubscribe") rawValue = header.value;
-      if (name === "list-unsubscribe-post" && header.value.includes("One-Click")) hasOneClick = true;
-    });
-    if (!rawValue) return null;
-    const urls = rawValue.match(/<([^>]+)>/g)?.map((m) => m.slice(1, -1)) || [];
-    const httpsUrl = urls.find((u) => u.startsWith("https://"));
-    const mailtoUrl = urls.find((u) => u.startsWith("mailto:"));
-    if (httpsUrl && hasOneClick) return { type: "one-click", url: httpsUrl };
-    if (httpsUrl) return { type: "https", url: httpsUrl };
-    if (mailtoUrl) return { type: "mailto", url: mailtoUrl };
-    return null;
   }
   async function executeUnsubscribe(email) {
     return new Promise((resolve, reject) => {
