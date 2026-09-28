@@ -1,5 +1,5 @@
 import { formatBytes, formatDate, escHtml, escapeCssValue, buildSenderQuery, parseUnsubscribeHeader } from "./utils.js";
-import { gmailGet, gmailPost, gmailBatchGet, isValidMessageId, AuthError } from './api.js';
+import { gmailGet, gmailPost, gmailBatchGet, isValidMessageId, revokeOAuthToken, AuthError } from './api.js';
 
 // --- State ---
 let token         = null;
@@ -168,7 +168,7 @@ function getToken(interactive) {
 
 async function clearAuthToken(oldToken) {
   if (oldToken) {
-    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${oldToken}`, { method: 'POST' }); } catch {}
+    try { await revokeOAuthToken(oldToken); } catch {}
   }
   if (chrome.identity.clearAllCachedAuthTokens) {
     try {

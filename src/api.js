@@ -7,6 +7,18 @@ export function isValidMessageId(id) {
   return typeof id === 'string' && MESSAGE_ID_REGEX.test(id);
 }
 
+export async function revokeOAuthToken(token) {
+  if (typeof token !== 'string' || token.length === 0) return;
+  const res = await fetch('https://oauth2.googleapis.com/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ token }).toString(),
+    credentials: 'omit',
+    redirect: 'error'
+  });
+  if (!res.ok) throw new Error(`OAuth revocation failed: ${res.status}`);
+}
+
 export async function fetchWithBackoff(url, options, retries = 4, delay = 1000) {
   for (let i = 0; i < retries; i++) {
     const res = await fetch(url, options);

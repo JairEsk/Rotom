@@ -61,7 +61,7 @@ Open `extension/manifest.json` and replace the placeholder:
 ```json
 "oauth2": {
   "client_id": "YOUR_CHROME_OAUTH_CLIENT_ID.apps.googleusercontent.com",
-  ...
+  "scopes": ["https://mail.google.com/"]
 }
 ```
 
