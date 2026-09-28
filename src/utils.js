@@ -79,6 +79,18 @@ export function escapeCssValue(value) {
   return result;
 }
 
+export function buildSenderQuery(value) {
+  if (typeof value !== 'string') return '';
+  let sanitized = '';
+  for (const char of value) {
+    const code = char.charCodeAt(0);
+    if (char === '"' || char === '\\') continue;
+    sanitized += code <= 0x1f || (code >= 0x7f && code <= 0x9f) ? ' ' : char;
+  }
+  const sender = sanitized.replace(/\s+/g, ' ').trim();
+  return sender ? `from:"${sender}"` : '';
+}
+
 function isPublicIpv6(ipv6) {
   if (ipv6.includes('%')) return false;
   const parts = ipv6.split('::');
