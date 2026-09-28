@@ -24,7 +24,7 @@
     }
   }
   function escHtml(t) {
-    if (!t) return "";
+    if (t == null) return "";
     return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
@@ -429,15 +429,15 @@
     const gmailLink = `https://mail.google.com/mail/u/0/#all/${email.id}`;
     if (email.unsubscribeInfo) tr.classList.add("has-unsub");
     tr.innerHTML = `
-    <td><input type="checkbox" class="email-check" data-id="${email.id}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
-    <td class="from-cell" title="${escHtml(email.from)}">
-      <a href="#" class="sender-filter-link" title="Click to filter by this sender">${escHtml(email.from)}</a>
+    <td><input type="checkbox" class="email-check" data-id="${escHtml(email.id)}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
+    <td class="from-cell">
+      <a href="#" class="sender-filter-link" title="Click to filter by this sender"></a>
     </td>
-    <td class="subject-cell" title="${escHtml(email.subject)}">
-      <a class="subject-link" href="${gmailLink}" target="_blank">${escHtml(email.subject) || "<em>no subject</em>"}</a>
+    <td class="subject-cell">
+      <a class="subject-link" href="${escHtml(gmailLink)}" target="_blank"></a>
     </td>
-    <td class="date-cell" title="${escHtml(email.date)}">${escHtml(dateStr)}</td>
-    <td class="size-cell">${escHtml(email.readableSize)}</td>
+    <td class="date-cell"></td>
+    <td class="size-cell"></td>
     <td class="actions-cell">
       ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ""}
     </td>
@@ -447,6 +447,7 @@
     const subjectCell = tr.querySelector(".subject-cell");
     const subjectLink = tr.querySelector(".subject-link");
     const dateCell = tr.querySelector(".date-cell");
+    const sizeCell = tr.querySelector(".size-cell");
     fromCell.title = email.from || "";
     senderLink.textContent = email.from || "";
     subjectCell.title = email.subject || "";
@@ -457,6 +458,7 @@
     }
     dateCell.title = email.date || "";
     dateCell.textContent = dateStr;
+    sizeCell.textContent = email.readableSize || "";
     tr.querySelector(".email-check").addEventListener("change", (e) => {
       e.target.checked ? selectedIds.add(email.id) : selectedIds.delete(email.id);
       syncHeaderCheckbox();

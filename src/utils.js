@@ -27,7 +27,7 @@ export function formatDate(raw) {
 }
 
 export function escHtml(t) {
-  if (!t) return '';
+  if (t == null) return '';
   return String(t)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

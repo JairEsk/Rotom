@@ -20,6 +20,8 @@ describe('utils', () => {
   it('escapes HTML special characters including quotes', () => {
     expect(escHtml('')).toBe('');
     expect(escHtml(null)).toBe('');
+    expect(escHtml(undefined)).toBe('');
+    expect(escHtml(0)).toBe('0');
     expect(escHtml('"Acme Corp" <info@acme.com>')).toBe('&quot;Acme Corp&quot; &lt;info@acme.com&gt;');
     expect(escHtml("O'Reilly & Associates <script>alert(1)</script>")).toBe(
       'O&#39;Reilly &amp; Associates &lt;script&gt;alert(1)&lt;/script&gt;'
