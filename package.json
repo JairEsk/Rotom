@@ -1,6 +1,6 @@
 {
   "name": "rotom",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "**Remover Of Trash & Obsolete Mails**",
   "main": "test_batch.js",
   "scripts": {

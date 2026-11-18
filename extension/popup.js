@@ -282,6 +282,7 @@
   var nextPageToken = null;
   var currentQuery = "";
   var hasMorePages = false;
+  var trashView = false;
   var FILTER_KEYS = ["size-filter", "category-filter", "date-filter", "sender-filter"];
   async function startJob(action, payload) {
     return new Promise((resolve, reject) => {
@@ -339,6 +340,8 @@
     document.getElementById("cancel-delete-btn").addEventListener("click", closeDeleteModal);
     document.getElementById("confirm-delete-btn").addEventListener("click", confirmDeleteForever);
     document.getElementById("empty-trash-btn").addEventListener("click", openEmptyTrashModal);
+    document.getElementById("trash-view-btn").addEventListener("click", toggleTrashView);
+    document.getElementById("restore-btn").addEventListener("click", confirmRestore);
     document.getElementById("cancel-empty-trash-btn").addEventListener("click", closeEmptyTrashModal);
     document.getElementById("confirm-empty-trash-btn").addEventListener("click", confirmEmptyTrash);
     document.getElementById("cancel-unsub-btn").addEventListener("click", closeUnsubscribeModal);
@@ -487,7 +490,22 @@
     if (category) parts.push(category);
     if (date) parts.push(date);
     if (sender) parts.push(sender);
+    if (trashView) parts.push("in:trash");
     return parts.join(" ");
+  }
+  function toggleTrashView() {
+    trashView = !trashView;
+    applyTrashViewMode();
+    scanEmails();
+  }
+  function applyTrashViewMode() {
+    const toggleBtn = document.getElementById("trash-view-btn");
+    toggleBtn.textContent = trashView ? "\u2190 Back to Inbox" : "\u{1F5D1} Trash";
+    toggleBtn.classList.toggle("active", trashView);
+    document.getElementById("trash-btn").style.display = trashView ? "none" : "";
+    document.getElementById("unsub-bulk-btn").style.display = trashView ? "none" : "";
+    document.getElementById("restore-btn").style.display = trashView ? "" : "none";
+    updateSelection();
   }
   async function scanEmails() {
     emails = [];
@@ -579,7 +597,8 @@
     tr.dataset.id = email.id;
     const dateStr = email.date ? formatDate(email.date) : "";
     const gmailLink = `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.id)}`;
-    if (email.unsubscribeInfo) tr.classList.add("has-unsub");
+    const canUnsub = !!email.unsubscribeInfo && !trashView;
+    if (canUnsub) tr.classList.add("has-unsub");
     tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${escHtml(email.id)}" ${selectedIds.has(email.id) ? "checked" : ""}></td>
     <td class="from-cell">
@@ -591,7 +610,7 @@
     <td class="date-cell"></td>
     <td class="size-cell"></td>
     <td class="actions-cell">
-      ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ""}
+      ${canUnsub ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ""}
     </td>
   `;
     const checkEl = tr.querySelector(".email-check");
@@ -629,7 +648,7 @@
       scanEmails();
     });
     body.appendChild(tr);
-    if (email.unsubscribeInfo) {
+    if (canUnsub) {
       const unsubBtnEl = tr.querySelector(".unsub-btn");
       if (unsubBtnEl) unsubBtnEl.addEventListener("click", () => openUnsubscribeModal(email));
       if (email.unsubscribeInfo.status) {
@@ -659,13 +678,14 @@
     const n = selectedIds.size;
     document.getElementById("selection-count").textContent = `${n} selected`;
     document.getElementById("trash-btn").disabled = n === 0;
+    document.getElementById("restore-btn").disabled = n === 0;
     const unsubCapable = emails.filter((e) => selectedIds.has(e.id) && e.unsubscribeInfo).length;
     const bulkUnsubBtn = document.getElementById("unsub-bulk-btn");
     bulkUnsubBtn.disabled = unsubCapable === 0;
     bulkUnsubBtn.textContent = unsubCapable > 0 ? `\u{1F6AB} Unsubscribe (${unsubCapable})` : "\u{1F6AB} Unsubscribe";
     document.getElementById("delete-btn").disabled = n === 0;
     const rec = document.getElementById("storage-recoverable");
-    if (n > 0) {
+    if (n > 0 && !trashView) {
       const total = emails.filter((e) => selectedIds.has(e.id)).reduce((s, e) => s + e.estimatedSize, 0);
       document.getElementById("recoverable-size").textContent = formatBytes(total);
       rec.style.display = "inline";
@@ -702,6 +722,28 @@
     } finally {
       btn.disabled = false;
       btn.textContent = "Trash";
+    }
+  }
+  async function confirmRestore() {
+    const ids = Array.from(selectedIds);
+    const btn = document.getElementById("restore-btn");
+    btn.disabled = true;
+    try {
+      const jobId = await startJob("RESTORE", { token, ids });
+      const jobResult = await pollJob(jobId, (job) => {
+        btn.textContent = `Restoring (${job.processed}/${job.total})...`;
+      });
+      if (jobResult.succeeded.length) removeFromList(jobResult.succeeded);
+      if (jobResult.succeeded.length && !jobResult.failed) showToast(`${jobResult.succeeded.length} email(s) restored from Trash \u2713`);
+      else if (jobResult.succeeded.length && jobResult.failed) showToast(`${jobResult.succeeded.length} restored, ${jobResult.failed} failed.`, true);
+    } catch (err) {
+      if (err instanceof AuthError) {
+        handleSessionExpired();
+        return;
+      } else showToast("Error: " + err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Restore";
     }
   }
   function openDeleteModal() {

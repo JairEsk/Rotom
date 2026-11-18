@@ -9,6 +9,7 @@ Rotom is a Chrome extension that helps you reclaim your Gmail storage by scannin
 - **Large Email Scanner** — Filter by size (1 MB → 25 MB, default 5 MB), category (Promotions, Social, Spam, Has attachment, Newsletters), age (1 month → 2 years), and sender. Results are sorted by size, 25 per page, with Load more.
 - **Bulk Trash / Delete Forever** — Trash (recoverable for 30 days) or permanently delete the selected emails, with confirmation modals and live progress. Long jobs run in the service worker, so they keep going if the popup closes.
 - **Empty Trash** — Permanently delete everything in Trash, with confirmation.
+- **Restore from Trash** — Browse your trashed emails and restore the selected ones back to your mailbox in bulk, with live progress.
 - **Unsubscribe** — Per-email and bulk unsubscribe from newsletters using the `List-Unsubscribe` header (one-click POST or mailto), with per-row status (pending / done / failed) and an option to also move the email to Trash.
 - **Recoverable size indicator** — See how much space the selected emails would free before you commit.
 - **Storage overview** — Total message count for your connected account.
@@ -21,7 +22,7 @@ Rotom is a Chrome extension that helps you reclaim your Gmail storage by scannin
 - Auth via `chrome.identity` + Google OAuth 2.0 (scope `https://mail.google.com/` — full Gmail access, needed to trash and delete).
 - The Gmail REST API is called directly from the extension; there is no server, and no data leaves your browser except to Google's APIs.
 - A scan lists message IDs, then fetches metadata in a single multipart batch request (Subject, From, Date, `List-Unsubscribe`).
-- Trash, Delete Forever, and Empty Trash run as background jobs in chunks of 1,000, with progress persisted in `chrome.storage.session` so a job survives service-worker restarts.
+- Trash, Delete Forever, Empty Trash, and Restore run as background jobs in chunks of 1,000, with progress persisted in `chrome.storage.session` so a job survives service-worker restarts.
 - API calls retry with exponential backoff on rate limiting (429).
 - Security: message IDs are validated before every API call, sender filters are sanitized so Gmail search operators stay literal text, HTML and CSS output is escaped, runtime messages are accepted only from the extension itself, unsubscribe URLs must be public HTTPS, and signing out revokes the OAuth token.
 
@@ -51,7 +52,7 @@ Rotom is a Chrome extension that helps you reclaim your Gmail storage by scannin
 │       ├── icon48.png
 │       └── icon128.png
 ├── src/                  ← Source of truth — edit here, then run npm run build
-│   ├── popup.js          ← Popup UI: scan, select, trash/delete/unsubscribe
+│   ├── popup.js          ← Popup UI: scan, select, trash/delete/restore/unsubscribe
 │   ├── background.js     ← Service worker: background jobs + unsubscribe
 │   ├── api.js            ← Gmail REST client + OAuth revocation
 │   ├── utils.js          ← Formatting, escaping, query + unsubscribe parsing
@@ -119,10 +120,10 @@ npm run lint  # lint src/ with ESLint
 2. Click **Connect Gmail** and sign in with Google (you can switch accounts from the auth screen).
 3. Set your filters (size, category, age, sender).
 4. Click **Scan**.
-5. Select emails and click **Trash**, **Delete**, or **Unsubscribe** (bulk unsubscribe only includes senders that support it). Click a sender's name to re-scan for that sender.
+5. Select emails and click **Trash**, **Delete**, or **Unsubscribe** (bulk unsubscribe only includes senders that support it). Click a sender's name to re-scan for that sender. Click **🗑 Trash** to browse your trashed emails and **Restore** the ones you want back.
 6. Use **Empty Trash** to permanently delete everything in Trash.
 
-> Trashed emails can be recovered from Gmail's Trash within 30 days. **Delete Forever** and **Empty Trash** cannot be undone.
+> Trashed emails can be recovered from Gmail's Trash within 30 days — or right from Rotom's Trash view with **Restore**. **Delete Forever** and **Empty Trash** cannot be undone.
 
 ## Cost
 

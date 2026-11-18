@@ -8,6 +8,7 @@ let selectedIds   = new Set();
 let nextPageToken = null;
 let currentQuery  = '';
 let hasMorePages  = false;
+let trashView     = false;
 
 const FILTER_KEYS = ['size-filter', 'category-filter', 'date-filter', 'sender-filter'];
 
@@ -73,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('cancel-delete-btn').addEventListener('click', closeDeleteModal);
   document.getElementById('confirm-delete-btn').addEventListener('click', confirmDeleteForever);
   document.getElementById('empty-trash-btn').addEventListener('click', openEmptyTrashModal);
+  document.getElementById('trash-view-btn').addEventListener('click', toggleTrashView);
+  document.getElementById('restore-btn').addEventListener('click', confirmRestore);
   document.getElementById('cancel-empty-trash-btn').addEventListener('click', closeEmptyTrashModal);
   document.getElementById('confirm-empty-trash-btn').addEventListener('click', confirmEmptyTrash);
   document.getElementById('cancel-unsub-btn').addEventListener('click', closeUnsubscribeModal);
@@ -226,7 +229,25 @@ function buildQuery() {
   if (category) parts.push(category);
   if (date)     parts.push(date);
   if (sender)   parts.push(sender);
+  if (trashView) parts.push('in:trash');
   return parts.join(' ');
+}
+
+// --- Trash view (restore) ---
+function toggleTrashView() {
+  trashView = !trashView;
+  applyTrashViewMode();
+  scanEmails();
+}
+
+function applyTrashViewMode() {
+  const toggleBtn = document.getElementById('trash-view-btn');
+  toggleBtn.textContent = trashView ? '← Back to Inbox' : '🗑 Trash';
+  toggleBtn.classList.toggle('active', trashView);
+  document.getElementById('trash-btn').style.display = trashView ? 'none' : '';
+  document.getElementById('unsub-bulk-btn').style.display = trashView ? 'none' : '';
+  document.getElementById('restore-btn').style.display = trashView ? '' : 'none';
+  updateSelection();
 }
 
 // --- Scan ---
@@ -347,8 +368,9 @@ function appendEmailRow(body, email) {
   const dateStr = email.date ? formatDate(email.date) : '';
   // Gmail web link for this message
   const gmailLink = `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(email.id)}`;
+  const canUnsub = !!email.unsubscribeInfo && !trashView;
 
-  if (email.unsubscribeInfo) tr.classList.add('has-unsub');
+  if (canUnsub) tr.classList.add('has-unsub');
   tr.innerHTML = `
     <td><input type="checkbox" class="email-check" data-id="${escHtml(email.id)}" ${selectedIds.has(email.id) ? 'checked' : ''}></td>
     <td class="from-cell">
@@ -360,7 +382,7 @@ function appendEmailRow(body, email) {
     <td class="date-cell"></td>
     <td class="size-cell"></td>
     <td class="actions-cell">
-      ${email.unsubscribeInfo ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
+      ${canUnsub ? '<button class="unsub-btn" title="Unsubscribe from this sender">&#x1F6AB;</button>' : ''}
     </td>
   `;
   const checkEl = tr.querySelector('.email-check');
@@ -403,7 +425,7 @@ function appendEmailRow(body, email) {
   });
 
   body.appendChild(tr);
-  if (email.unsubscribeInfo) {
+  if (canUnsub) {
     const unsubBtnEl = tr.querySelector('.unsub-btn');
     if (unsubBtnEl) unsubBtnEl.addEventListener('click', () => openUnsubscribeModal(email));
     if (email.unsubscribeInfo.status) {
@@ -436,6 +458,7 @@ function updateSelection() {
   const n = selectedIds.size;
   document.getElementById('selection-count').textContent = `${n} selected`;
   document.getElementById('trash-btn').disabled  = n === 0;
+  document.getElementById('restore-btn').disabled = n === 0;
   const unsubCapable = emails.filter(e => selectedIds.has(e.id) && e.unsubscribeInfo).length;
   const bulkUnsubBtn = document.getElementById('unsub-bulk-btn');
   bulkUnsubBtn.disabled = unsubCapable === 0;
@@ -443,7 +466,7 @@ function updateSelection() {
   document.getElementById('delete-btn').disabled = n === 0;
 
   const rec = document.getElementById('storage-recoverable');
-  if (n > 0) {
+  if (n > 0 && !trashView) {
     const total = emails.filter(e => selectedIds.has(e.id))
                         .reduce((s, e) => s + e.estimatedSize, 0);
     document.getElementById('recoverable-size').textContent = formatBytes(total);
@@ -482,6 +505,29 @@ async function confirmTrash() {
     else showToast('Error: ' + err.message, true);
   } finally {
     btn.disabled = false; btn.textContent = 'Trash';
+  }
+}
+
+// --- Restore from Trash ---
+async function confirmRestore() {
+  const ids = Array.from(selectedIds);
+  const btn = document.getElementById('restore-btn');
+  btn.disabled = true;
+
+  try {
+    const jobId = await startJob('RESTORE', { token, ids });
+    const jobResult = await pollJob(jobId, (job) => {
+      btn.textContent = `Restoring (${job.processed}/${job.total})...`;
+    });
+
+    if (jobResult.succeeded.length) removeFromList(jobResult.succeeded);
+    if (jobResult.succeeded.length && !jobResult.failed) showToast(`${jobResult.succeeded.length} email(s) restored from Trash ✓`);
+    else if (jobResult.succeeded.length && jobResult.failed) showToast(`${jobResult.succeeded.length} restored, ${jobResult.failed} failed.`, true);
+  } catch (err) {
+    if (err instanceof AuthError) { handleSessionExpired(); return; }
+    else showToast('Error: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Restore';
   }
 }
 

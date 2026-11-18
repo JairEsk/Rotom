@@ -131,7 +131,7 @@
     });
   }
   var STALE_JOB_TIMEOUT_MS = 6e4;
-  var JOB_ACTIONS = /* @__PURE__ */ new Set(["TRASH", "DELETE_FOREVER", "EMPTY_TRASH"]);
+  var JOB_ACTIONS = /* @__PURE__ */ new Set(["TRASH", "DELETE_FOREVER", "EMPTY_TRASH", "RESTORE"]);
   var JOB_ID_REGEX = /^\d{13}$/;
   function isRecord(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -257,6 +257,13 @@
           ids,
           jobId,
           (chunk) => gmailPost("messages/batchDelete", token, { ids: chunk }),
+          succeeded
+        );
+      } else if (action === "RESTORE") {
+        await processInBatches(
+          ids,
+          jobId,
+          (chunk) => gmailPost("messages/batchModify", token, { ids: chunk, removeLabelIds: ["TRASH"] }),
           succeeded
         );
       } else if (action === "EMPTY_TRASH") {

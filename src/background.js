@@ -8,7 +8,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onInstalled) {
 }
 
 const STALE_JOB_TIMEOUT_MS = 60000;
-const JOB_ACTIONS = new Set(['TRASH', 'DELETE_FOREVER', 'EMPTY_TRASH']);
+const JOB_ACTIONS = new Set(['TRASH', 'DELETE_FOREVER', 'EMPTY_TRASH', 'RESTORE']);
 const JOB_ID_REGEX = /^\d{13}$/;
 
 function isRecord(value) {
@@ -164,6 +164,11 @@ async function runJob(jobId, action, payload) {
     } else if (action === 'DELETE_FOREVER') {
       await processInBatches(ids, jobId, chunk => 
         gmailPost('messages/batchDelete', token, { ids: chunk }),
+        succeeded
+      );
+    } else if (action === 'RESTORE') {
+      await processInBatches(ids, jobId, chunk =>
+        gmailPost('messages/batchModify', token, { ids: chunk, removeLabelIds: ['TRASH'] }),
         succeeded
       );
     } else if (action === 'EMPTY_TRASH') {
