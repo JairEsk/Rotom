@@ -1,5 +1,5 @@
 {
-  "name": "jair-recursive-demon-sorcerer",
+  "name": "rotom",
   "version": "1.0.0",
   "description": "**Remover Of Trash & Obsolete Mails**",
   "main": "test_batch.js",
@@ -10,7 +10,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@eslint/js": "^9.39.5",
