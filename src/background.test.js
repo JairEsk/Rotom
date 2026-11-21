@@ -34,6 +34,11 @@ describe('runtime message validation', () => {
     })).toBe(true);
     expect(isValidRuntimeMessage({
       type: 'START_JOB',
+      action: 'RESTORE',
+      payload: { token, ids: ['18f3c2a9b01d4e5f'] }
+    })).toBe(true);
+    expect(isValidRuntimeMessage({
+      type: 'START_JOB',
       action: 'EMPTY_TRASH',
       payload: { token }
     })).toBe(true);
@@ -99,6 +104,7 @@ describe('runtime message validation', () => {
       { type: 'UNKNOWN' },
       { type: 'START_JOB', action: 'DELETE_ALL', payload: { token, ids: ['18f3c2a9b01d4e5f'] } },
       { type: 'START_JOB', action: 'TRASH', payload: { token, ids: [] } },
+      { type: 'START_JOB', action: 'RESTORE', payload: { token, ids: [] } },
       { type: 'START_JOB', action: 'TRASH', payload: { token, ids: ['../messages/123'] } },
       { type: 'START_JOB', action: 'EMPTY_TRASH', payload: { token: '' } },
       { type: 'GET_JOB_STATUS', jobId: '../filters' },
